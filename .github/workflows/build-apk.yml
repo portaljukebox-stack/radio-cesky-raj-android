@@ -27,6 +27,16 @@ jobs:
           cp app/src/main/assets/icon.webp app/src/main/res/drawable-nodpi/radio_icon_exact.webp
           gradle --no-daemon assembleDebug
           cp app/build/outputs/apk/debug/app-debug.apk Radio_Cesky_Raj.apk
+      - name: Validate APK signature and manifest
+        run: |
+          echo '----- APK filesize -----'
+          stat -c '%n = %s bytes' Radio_Cesky_Raj.apk
+          echo '----- Build tools -----'
+          ls "$ANDROID_HOME/build-tools" || true
+          TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$TOOLS/apksigner" verify --verbose --print-certs Radio_Cesky_Raj.apk
+          "$TOOLS/aapt" dump badging Radio_Cesky_Raj.apk | head -n 18
+          "$TOOLS/zipalign" -c -v 4 Radio_Cesky_Raj.apk
       - uses: actions/upload-artifact@v4
         with:
           name: Radio_Cesky_Raj_APK
