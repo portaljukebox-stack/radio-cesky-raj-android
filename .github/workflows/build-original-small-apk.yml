@@ -44,6 +44,15 @@ jobs:
         working-directory: radio_cesky_raj
         run: |
           flutter pub get
+          python3 - <<'PY'
+          from pathlib import Path
+          cache=Path.home()/'.pub-cache/hosted/pub.dev/radio_player-1.2.1/android/build.gradle'
+          gradle=cache.read_text()
+          assert gradle.count('com.google.android.exoplayer:') == 2, "Radio player dependency layout changed"
+          assert gradle.count('2.17.1') == 2, "Original ExoPlayer version changed"
+          cache.write_text(gradle.replace('2.17.1','2.19.1'))
+          print("Upgraded legacy ExoPlayer from 2.17.1 to 2.19.1 to support Android14+ receivers")
+          PY
           flutter build apk --release --split-per-abi --no-pub
       - name: Validate APKs, names and signing
         shell: bash
