@@ -1,0 +1,24 @@
+name: Check exact logo asset
+on:
+  push:
+    paths:
+      - '.github/workflows/check-image.yml'
+      - 'assets/branding/rcr_full_logo.webp'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 -m pip install --user Pillow==12.0.0
+          file assets/branding/rcr_full_logo.webp
+          sha256sum assets/branding/rcr_full_logo.webp
+          python3 - <<'PY'
+          from PIL import Image
+          p='assets/branding/rcr_full_logo.webp'
+          with Image.open(p) as im:
+              im.load()
+              print('VALID FULL LOGO', im.size, im.format)
+              assert im.width >= 500 and im.height >= 250
+          PY
