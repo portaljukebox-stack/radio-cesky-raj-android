@@ -12,6 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           python3 -m pip install --user Pillow==12.0.0
+          python3 tools/verify_logo.py
           file assets/branding/rcr_full_logo.webp
           sha256sum assets/branding/rcr_full_logo.webp
           python3 - <<'PY'
