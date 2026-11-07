@@ -91,6 +91,41 @@ if "Config.partnerWebsite" not in s:
         sys.exit("Unexpected sidebar structure; will not discard original layout.")
     s = s.replace("      // Email", partner + "      // Email", 1)
 write("lib/widgets/sidebar.dart", s)
+# Change the sidebar's privacy entry from a modal dialog into a proper
+# screen. Preserve the original player route; the audio view model is shared.
+s = read("lib/widgets/sidebar.dart")
+s = s.replace("import 'package:single_radio/widgets/markdown.dart';\n",
+              "import 'package:single_radio/screens/privacy/privacy_view.dart';\n")
+privacy_start = s.find("          showDialog(")
+privacy_end = s.find("\n            },\n          ),", privacy_start)
+if privacy_start < 0 or privacy_end < 0:
+    sys.exit("STOP: privacy dialog navigation in original Sidebar not recognized")
+# The onTap closes Drawer first, then pushes a regular MaterialPageRoute.
+s = s[:privacy_start] + "          Navigator.pushNamed(context, PrivacyView.routeName);" + s[privacy_end:]
+write("lib/widgets/sidebar.dart", s)
+
+s = read("lib/main.dart")
+import_anchor = "import 'package:single_radio/screens/about/about_view.dart';"
+if import_anchor not in s:
+    sys.exit("STOP: original Flutter router was changed")
+s = s.replace(import_anchor,
+    import_anchor + "\\nimport 'package:single_radio/screens/privacy/privacy_view.dart';")
+route_anchor = "      case AboutView.routeName:"
+if route_anchor not in s:
+    sys.exit("STOP: cannot find original AboutView navigation")
+s = s.replace(route_anchor,
+    "      case PrivacyView.routeName:\\n"
+    "        return MaterialPageRoute(\\n"
+    "          builder: (context) => const PrivacyView(),\\n"
+    "        );\\n" + route_anchor)
+write("lib/main.dart", s)
+
+privacy_template = ROOT / "tools/templates/privacy_view.dart"
+if not privacy_template.is_file():
+    sys.exit("STOP: missing native privacy page template")
+write("lib/screens/privacy/privacy_view.dart", privacy_template.read_text(encoding="utf-8"))
+print("NATIVE PRIVACY SCREEN REGISTERED as /privacy; no MarkdownDialog overlay")
+
 s = read("lib/theme.dart")
 colors = {
     "0xFF141C27":"0xFF101A27",
@@ -257,92 +292,8 @@ for p in android_res.rglob("*.png"):
 print("ALL Android launcher and splash resources replaced with station artwork")
 
 
-# Build the actual WIDE on-air station logo, distinct from the square
-# Android launcher icon. Never stretch/crop the 16:9-like station artwork.
-wide_path=ROOT/"assets/branding/rcr_full_logo.webp"
-if not wide_path.is_file():
-    sys.exit("FULL STATION LOGO MISSING: assets/branding/rcr_full_logo.webp")
-full_logo=Image.open(wide_path).convert("RGB")
-full_logo_dst=out/"assets/images/rcr_full_logo.png"
-full_logo_dst.parent.mkdir(parents=True, exist_ok=True)
-full_logo.save(full_logo_dst,format="PNG",optimize=True)
-print("Full aspect ratio radio logo ready:",full_logo.size)
-
-# Restore the ORIGINAL Flutter player: only improve the art section. The
-# entire logo stays visible. Optional song artwork is shown underneath and
-# NEVER substitutes the official station logo.
-player=read("lib/screens/player/player_view.dart")
-player_start=player.find("          const ExpandedBox(flex: 2, minHeight: 20),")
-player_end=player.find("          Row(\n            mainAxisAlignment: MainAxisAlignment.spaceBetween,",player_start)
-if player_start < 0 or player_end < 0:
-    sys.exit("Unexpected original Flutter player view. Refusing to replace original screen.")
-new_art_section="""          const SizedBox(height: 12),
-          Image.asset(
-            'assets/images/rcr_full_logo.png',
-            width: MediaQuery.of(context).size.width - padding * 2,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-          ),
-          const SizedBox(height: 22),
-          if (viewModel.artwork != null) ...[
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 450),
-              child: _Cover(
-                key: viewModel.artwork?.key,
-                size: (MediaQuery.of(context).size.width - padding * 2) * 0.65,
-                image: viewModel.artwork!,
-              ),
-            ),
-            const SizedBox(height: 22),
-          ],
-"""
-player=player[:player_start]+new_art_section+player[player_end:]
-# No empty oversized square and no zoom of a cropped station image.
-write("lib/screens/player/player_view.dart",player)
-
-# iTunes artwork lookup requires genuine musician/title ICY metadata.
-# Editorial features or unknown metadata always retain station branding.
-viewmodel=read("lib/screens/player/player_viewmodel.dart")
-needle="""  List<String>? metadata;
-"""
-viewmodel=viewmodel.replace(needle,needle+"  int _artworkRequest = 0;\n",1)
-old="""      log(metadata.toString());
-      metadata = value;
-      if (Config.showAlbumCover) artwork = await _radioPlayer.getArtworkImage();
-      notifyListeners();"""
-new="""      metadata = value;
-      final requestId = ++_artworkRequest;
-      artwork = null;
-      notifyListeners();
-      if (!Config.showAlbumCover || value.length < 2) return;
-      final performer = value[0].trim().toLowerCase();
-      final song = value[1].trim().toLowerCase();
-      final isSong = performer.isNotEmpty &&
-          song.isNotEmpty &&
-          performer != song &&
-          !performer.contains('rádio český ráj') &&
-          !performer.contains('radio cesky raj') &&
-          !song.contains('hřídelecká hůrka') &&
-          !song.contains('zprávy') &&
-          !song.contains('jmeniny') &&
-          !song.contains('večeř') &&
-          !song.contains('příběh') &&
-          !song.contains('víte, že');
-      if (!isSong) return;
-      try {
-        final image = await _radioPlayer.getArtworkImage();
-        if (requestId != _artworkRequest) return;
-        artwork = image;
-        notifyListeners();
-      } catch (error) {
-        log('Album artwork not available: $error');
-      }"""
-if old not in viewmodel:
-    sys.exit("Unexpected Flutter metadata listener; aborting patch")
-viewmodel=viewmodel.replace(old,new)
-write("lib/screens/player/player_viewmodel.dart",viewmodel)
-print("Full logo/player/metadata cover fixes applied")
-
+# Keep the proven original Flutter player unchanged in this privacy-screen fix.
+# A separate redesign of full-width branding and artwork must be tested independently.
 # Make source brand search fail loudly rather than publishing a brewery app.
 for test in ["lib/config.dart", "assets/text/about.md", "assets/text/privacy_policy.md"]:
     if any(w in read(test).lower() for w in ("rohozec", "pivovar")):
