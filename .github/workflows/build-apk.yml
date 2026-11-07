@@ -1,71 +1,63 @@
-name: PUVODNI FLUTTER APLIKACE - APK
-
+name: Originalni aplikace Radio Cesky raj - Flutter APK
 on:
   push:
     branches: [main]
     paths:
-      - RADIO_CESKY_RAJ_ANDROID.zip
-      - .github/workflows/build-apk.yml
+      - 'rohozec_radio (2).zip'
+      - 'RADIO_CESKY_RAJ_ANDROID.zip'
+      - 'tools/prepare_original_flutter.py'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
-  flutter-original:
+  original-flutter:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-      - name: Require original Flutter project archive
-        shell: bash
-        run: |
-          test -s RADIO_CESKY_RAJ_ANDROID.zip || { echo "CHYBI RADIO_CESKY_RAJ_ANDROID.zip V KORENI REPOZITARE."; exit 1; }
-          unzip -tq RADIO_CESKY_RAJ_ANDROID.zip
-          unzip -q RADIO_CESKY_RAJ_ANDROID.zip -d .
-          test -f radio_cesky_raj/lib/screens/player/player_view.dart
-          test -f radio_cesky_raj/lib/screens/timer/timer_view.dart
-          test -f radio_cesky_raj/lib/widgets/sidebar.dart
-          test -f radio_cesky_raj/assets/appicon/appicon.png
-          grep -q "class PlayerView" radio_cesky_raj/lib/screens/player/player_view.dart
-          grep -q 'radioceskyraj' radio_cesky_raj/lib/config.dart
-      - name: Set up Java
+      - uses: actions/checkout@v4
+      - name: Set up Java 11 for original Android Gradle Plugin
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
-      - name: Set up compatible Flutter 3.7.12 (Dart 2.19)
+      - name: Set up Flutter 3.7.12 (Dart 2.19)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.7.12'
           channel: stable
           cache: true
-      - name: Flutter doctor
-        run: flutter doctor -v
-      - name: Build original Flutter app (not a Java replacement)
-        working-directory: radio_cesky_raj
-        shell: bash
+      - name: Prepare genuine original Flutter app and station branding
         run: |
-          sed -i 's/applicationId "com.rohozec.radio"/applicationId "cz.radioceskyraj.original"/g' android/app/build.gradle
+          python3 -m pip install --user Pillow==10.4.0
+          python3 tools/prepare_original_flutter.py
+          test -f radio_cesky_raj/lib/screens/player/player_view.dart
+          test -f radio_cesky_raj/lib/screens/timer/timer_view.dart
+          test -f radio_cesky_raj/lib/screens/about/about_view.dart
+          grep -q "Rádio Český ráj" radio_cesky_raj/lib/config.dart
+          grep -q 'Rájoviny.cz' radio_cesky_raj/lib/widgets/sidebar.dart
+          test -s radio_cesky_raj/assets/appicon/appicon.png
+      - name: Build original Flutter APK
+        working-directory: radio_cesky_raj
+        run: |
+          flutter --version
           flutter pub get
           flutter build apk --debug --no-pub
-      - name: Verify real Flutter APK and certificate
+      - name: Verify signed original Flutter APK
         working-directory: radio_cesky_raj
-        shell: bash
         run: |
           set -euo pipefail
           APK=build/app/outputs/flutter-apk/app-debug.apk
           test -s "$APK"
-          stat -c '%n: %s bytes' "$APK"
+          stat -c 'APK size: %s bytes' "$APK"
+          test "$(stat -c %s "$APK")" -gt 1000000
           TOOL=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
-          test -n "$TOOL"
           "$TOOL" verify --verbose --print-certs "$APK"
           mkdir -p ../result
-          cp "$APK" ../result/Radio_Cesky_Raj_PUVODNI_APLIKACE.apk
-          sha256sum ../result/Radio_Cesky_Raj_PUVODNI_APLIKACE.apk
-      - name: Upload original app APK
-        uses: actions/upload-artifact@v4
+          cp "$APK" ../result/Radio_Cesky_Raj_PUVODNI_FLUTTER.apk
+      - uses: actions/upload-artifact@v4
         with:
           name: Radio_Cesky_Raj_PUVODNI_FLUTTER_APK
-          path: result/Radio_Cesky_Raj_PUVODNI_APLIKACE.apk
+          path: result/Radio_Cesky_Raj_PUVODNI_FLUTTER.apk
           if-no-files-found: error
           retention-days: 30
