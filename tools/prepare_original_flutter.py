@@ -98,7 +98,7 @@ s = s.replace("import 'package:single_radio/widgets/markdown.dart';\n",
               "import 'package:single_radio/screens/privacy/privacy_view.dart';\n")
 # Replace the onTap show's Dialog; do not alter any other sidebar item.
 s, privacy_changes = re.subn(
-    r"(?ms)^          showDialog\\(.*?^          \\);",
+    r"(?ms)^          showDialog\(.*?^          \);",
     "          Navigator.pushNamed(context, PrivacyView.routeName);",
     s,
     count=1,
