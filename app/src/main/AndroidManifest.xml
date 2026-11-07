@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <application android:label="Rádio Český ráj" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="false" android:icon="@drawable/radio_icon" android:roundIcon="@drawable/radio_icon">
+    <application android:label="Rádio Český ráj" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="false" android:icon="@drawable/radio_icon_exact" android:roundIcon="@drawable/radio_icon_exact">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
