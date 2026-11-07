@@ -147,7 +147,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.2.0+33", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.2.1+34", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -199,6 +199,22 @@ if 'android.permission.INTERNET' not in s:
     s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
 s = re.sub(r'(?ms)        <meta-data\s+android:name="com\.google\.firebase\..*?/>', '', s)
 write("android/app/src/main/AndroidManifest.xml",s)
+# Android 14+ requires a declared mediaPlayback foreground-service type and
+# matching permission, independent from receiver export flags.
+s=read("android/app/src/main/AndroidManifest.xml")
+if 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK' not in s:
+    s=s.replace('<application', '''<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application''',1)
+service_tag='''<service
+            android:name="com.cheebeez.radio_player.RadioPlayerService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />'''
+if 'com.cheebeez.radio_player.RadioPlayerService' not in s:
+    s=s.replace('    </application>', '        '+service_tag+'\n    </application>',1)
+write("android/app/src/main/AndroidManifest.xml",s)
+
 write("assets/text/about.md", """# Rádio Český ráj
 
 Vítejte u Rádia Český ráj. Vysíláme pro všechny, kteří mají rádi náš kraj, jeho příběhy, lidi a dobrou hudbu.
