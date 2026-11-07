@@ -27,6 +27,11 @@ jobs:
           python3 -m pip install --user Pillow==12.0.0
           python3 tools/verify_logo.py
           python3 tools/prepare_original_flutter.py
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name aapt2 -type f | sort -V | tail -1)
+          test -x "$AAPT2"
+          echo "New Android Asset Packaging Tool: $AAPT2"
+          echo "android.aapt2FromMavenOverride=$AAPT2" >> radio_cesky_raj/android/gradle.properties
+
           python3 - <<'PY'
           from pathlib import Path
           gradle=Path('radio_cesky_raj/android/app/build.gradle')
