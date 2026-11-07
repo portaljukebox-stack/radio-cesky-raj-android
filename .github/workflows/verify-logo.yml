@@ -1,0 +1,23 @@
+name: Verify station logo from connected Rájoviny media
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/verify-logo.yml]
+  workflow_dispatch:
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download existing published station artwork (read only)
+        run: |
+          curl -fSL --retry 3 --max-time 40 'https://rajoviny.cz/wp-content/uploads/2026/09/ChatGPT-Image-20.-9.-2026-00_20_58.webp' -o logo.webp
+          file logo.webp
+          test "$(stat -c %s logo.webp)" -gt 10000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: station-logo-review
+          path: logo.webp
+          retention-days: 7
