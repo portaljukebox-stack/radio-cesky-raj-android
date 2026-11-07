@@ -52,8 +52,8 @@ write("lib/config.dart", """class Config {
   static const shareText = 'Poslouchám Rádio Český ráj. https://www.radioceskyraj.cz/';
   static const appStoreId = '0123456789';
   static const autoplay = false;
-  static const showAlbumCover = false;
-  static const albumCoverFromItunes = false;
+  static const showAlbumCover = true;
+  static const albumCoverFromItunes = true;
   static const textScrolling = true;
   static const metadataUrl = '';
   static const artistTag = 'artist';
@@ -109,7 +109,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.0.1+31", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.1.0+32", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -255,6 +255,93 @@ for p in android_res.rglob("*.png"):
         if rr > gg*1.75 and rr > bb*1.6:
             sys.exit("Old brewery-colored Android asset detected: "+str(p))
 print("ALL Android launcher and splash resources replaced with station artwork")
+
+
+# Build the actual WIDE on-air station logo, distinct from the square
+# Android launcher icon. Never stretch/crop the 16:9-like station artwork.
+wide_path=ROOT/"assets/branding/rcr_full_logo.webp"
+if not wide_path.is_file():
+    sys.exit("FULL STATION LOGO MISSING: assets/branding/rcr_full_logo.webp")
+full_logo=Image.open(wide_path).convert("RGB")
+full_logo_dst=out/"assets/images/rcr_full_logo.png"
+full_logo_dst.parent.mkdir(parents=True, exist_ok=True)
+full_logo.save(full_logo_dst,format="PNG",optimize=True)
+print("Full aspect ratio radio logo ready:",full_logo.size)
+
+# Restore the ORIGINAL Flutter player: only improve the art section. The
+# entire logo stays visible. Optional song artwork is shown underneath and
+# NEVER substitutes the official station logo.
+player=read("lib/screens/player/player_view.dart")
+player_start=player.find("          const ExpandedBox(flex: 2, minHeight: 20),")
+player_end=player.find("          Row(\n            mainAxisAlignment: MainAxisAlignment.spaceBetween,",player_start)
+if player_start < 0 or player_end < 0:
+    sys.exit("Unexpected original Flutter player view. Refusing to replace original screen.")
+new_art_section="""          const SizedBox(height: 12),
+          Image.asset(
+            'assets/images/rcr_full_logo.png',
+            width: MediaQuery.of(context).size.width - padding * 2,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+          const SizedBox(height: 22),
+          if (viewModel.artwork != null) ...[
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 450),
+              child: _Cover(
+                key: viewModel.artwork?.key,
+                size: (MediaQuery.of(context).size.width - padding * 2) * 0.65,
+                image: viewModel.artwork!,
+              ),
+            ),
+            const SizedBox(height: 22),
+          ],
+"""
+player=player[:player_start]+new_art_section+player[player_end:]
+# No empty oversized square and no zoom of a cropped station image.
+write("lib/screens/player/player_view.dart",player)
+
+# iTunes artwork lookup requires genuine musician/title ICY metadata.
+# Editorial features or unknown metadata always retain station branding.
+viewmodel=read("lib/screens/player/player_viewmodel.dart")
+needle="""  List<String>? metadata;
+"""
+viewmodel=viewmodel.replace(needle,needle+"  int _artworkRequest = 0;\n",1)
+old="""      log(metadata.toString());
+      metadata = value;
+      if (Config.showAlbumCover) artwork = await _radioPlayer.getArtworkImage();
+      notifyListeners();"""
+new="""      metadata = value;
+      final requestId = ++_artworkRequest;
+      artwork = null;
+      notifyListeners();
+      if (!Config.showAlbumCover || value.length < 2) return;
+      final performer = value[0].trim().toLowerCase();
+      final song = value[1].trim().toLowerCase();
+      final isSong = performer.isNotEmpty &&
+          song.isNotEmpty &&
+          performer != song &&
+          !performer.contains('rádio český ráj') &&
+          !performer.contains('radio cesky raj') &&
+          !song.contains('hřídelecká hůrka') &&
+          !song.contains('zprávy') &&
+          !song.contains('jmeniny') &&
+          !song.contains('večeř') &&
+          !song.contains('příběh') &&
+          !song.contains('víte, že');
+      if (!isSong) return;
+      try {
+        final image = await _radioPlayer.getArtworkImage();
+        if (requestId != _artworkRequest) return;
+        artwork = image;
+        notifyListeners();
+      } catch (error) {
+        log('Album artwork not available: $error');
+      }"""
+if old not in viewmodel:
+    sys.exit("Unexpected Flutter metadata listener; aborting patch")
+viewmodel=viewmodel.replace(old,new)
+write("lib/screens/player/player_viewmodel.dart",viewmodel)
+print("Full logo/player/metadata cover fixes applied")
 
 # Make source brand search fail loudly rather than publishing a brewery app.
 for test in ["lib/config.dart", "assets/text/about.md", "assets/text/privacy_policy.md"]:
