@@ -1,57 +1,71 @@
-name: Build Android APK
+name: PUVODNI FLUTTER APLIKACE - APK
+
 on:
   push:
     branches: [main]
+    paths:
+      - RADIO_CESKY_RAJ_ANDROID.zip
+      - .github/workflows/build-apk.yml
   workflow_dispatch:
+
 jobs:
-  build:
+  flutter-original:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Require original Flutter project archive
+        shell: bash
+        run: |
+          test -s RADIO_CESKY_RAJ_ANDROID.zip || { echo "CHYBI RADIO_CESKY_RAJ_ANDROID.zip V KORENI REPOZITARE."; exit 1; }
+          unzip -tq RADIO_CESKY_RAJ_ANDROID.zip
+          unzip -q RADIO_CESKY_RAJ_ANDROID.zip -d .
+          test -f radio_cesky_raj/lib/screens/player/player_view.dart
+          test -f radio_cesky_raj/lib/screens/timer/timer_view.dart
+          test -f radio_cesky_raj/lib/widgets/sidebar.dart
+          test -f radio_cesky_raj/assets/appicon/appicon.png
+          grep -q "class PlayerView" radio_cesky_raj/lib/screens/player/player_view.dart
+          grep -q 'radioceskyraj' radio_cesky_raj/lib/config.dart
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+          java-version: '11'
+      - name: Set up compatible Flutter 3.7.12 (Dart 2.19)
+        uses: subosito/flutter-action@v2
         with:
-          gradle-version: '8.9'
-      - name: Verify Android SDK
+          flutter-version: '3.7.12'
+          channel: stable
+          cache: true
+      - name: Flutter doctor
+        run: flutter doctor -v
+      - name: Build original Flutter app (not a Java replacement)
+        working-directory: radio_cesky_raj
+        shell: bash
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME/platforms" || true
-      - name: Build installable APK
+          sed -i 's/applicationId "com.rohozec.radio"/applicationId "cz.radioceskyraj.original"/g' android/app/build.gradle
+          flutter pub get
+          flutter build apk --debug --no-pub
+      - name: Verify real Flutter APK and certificate
+        working-directory: radio_cesky_raj
+        shell: bash
         run: |
-          mkdir -p app/src/main/res/drawable-nodpi
-          cp app/src/main/assets/icon.webp app/src/main/res/drawable-nodpi/radio_icon_exact.webp
-          gradle --no-daemon assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk Radio_Cesky_Raj.apk
-      - name: Validate APK signature and manifest
-        run: |
-          echo '----- APK filesize -----'
-          stat -c '%n = %s bytes' Radio_Cesky_Raj.apk
-          echo '----- Build tools -----'
-          ls "$ANDROID_HOME/build-tools" || true
-          TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$TOOLS/apksigner" verify --verbose --print-certs Radio_Cesky_Raj.apk
-          "$TOOLS/aapt" dump badging Radio_Cesky_Raj.apk | head -n 18
-          "$TOOLS/zipalign" -c -v 4 Radio_Cesky_Raj.apk
-      - name: Install and launch APK in Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
+          set -euo pipefail
+          APK=build/app/outputs/flutter-apk/app-debug.apk
+          test -s "$APK"
+          stat -c '%n: %s bytes' "$APK"
+          TOOL=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          test -n "$TOOL"
+          "$TOOL" verify --verbose --print-certs "$APK"
+          mkdir -p ../result
+          cp "$APK" ../result/Radio_Cesky_Raj_PUVODNI_APLIKACE.apk
+          sha256sum ../result/Radio_Cesky_Raj_PUVODNI_APLIKACE.apk
+      - name: Upload original app APK
+        uses: actions/upload-artifact@v4
         with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: |
-            adb install -r Radio_Cesky_Raj.apk
-            adb shell am start -n cz.radioceskyraj.mobile/cz.radioceskyraj.app.MainActivity
-            sleep 3
-            adb shell pidof cz.radioceskyraj.mobile
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Radio_Cesky_Raj_APK
-          path: Radio_Cesky_Raj.apk
+          name: Radio_Cesky_Raj_PUVODNI_FLUTTER_APK
+          path: result/Radio_Cesky_Raj_PUVODNI_APLIKACE.apk
+          if-no-files-found: error
           retention-days: 30
