@@ -37,6 +37,19 @@ jobs:
           "$TOOLS/apksigner" verify --verbose --print-certs Radio_Cesky_Raj.apk
           "$TOOLS/aapt" dump badging Radio_Cesky_Raj.apk | head -n 18
           "$TOOLS/zipalign" -c -v 4 Radio_Cesky_Raj.apk
+      - name: Install and launch APK in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r Radio_Cesky_Raj.apk
+            adb shell am start -n cz.radioceskyraj.mobile/cz.radioceskyraj.app.MainActivity
+            sleep 3
+            adb shell pidof cz.radioceskyraj.mobile
       - uses: actions/upload-artifact@v4
         with:
           name: Radio_Cesky_Raj_APK
