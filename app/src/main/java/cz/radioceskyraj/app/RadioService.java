@@ -12,6 +12,7 @@ public class RadioService extends Service {
     public static final String ACTION_STATE = "cz.radioceskyraj.app.STATE";
     private static final String STREAM = "https://portal.juke-box.cz:2020/stream/radioceskyraj";
     private static final String CHANNEL = "radio_playback";
+    public static volatile String currentState = "Připraveno k přehrávání";
     private MediaPlayer player;
     private boolean playing = false;
     private boolean preparing = false;
@@ -35,6 +36,7 @@ public class RadioService extends Service {
             .setOngoing(true).build();
     }
     private void sendState(String state) {
+        currentState = state;
         Intent intent = new Intent(ACTION_STATE).setPackage(getPackageName());
         intent.putExtra("state", state);
         sendBroadcast(intent);
@@ -88,7 +90,7 @@ public class RadioService extends Service {
     private void stopPlayback() {
         cleanup();
         stopForeground(STOP_FOREGROUND_REMOVE);
-        sendState("Zastaveno");
+        if (!currentState.equals("Stream se nepodařilo přehrát") && !currentState.equals("Připojení selhalo")) sendState("Zastaveno");
         stopSelf();
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
