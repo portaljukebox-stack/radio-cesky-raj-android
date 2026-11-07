@@ -1,0 +1,36 @@
+name: Diagnose Android 14+ receiver crash in original Flutter plugins
+on:
+  push:
+    paths: ['.github/workflows/diagnose-receivers.yml']
+  workflow_dispatch:
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.7.12'
+          channel: stable
+          cache: true
+      - name: Prepare original Flutter application and dependencies
+        run: |
+          python3 -m pip install --user Pillow==12.0.0
+          python3 tools/verify_logo.py
+          python3 tools/prepare_original_flutter.py
+          cd radio_cesky_raj
+          flutter pub get
+      - name: Diagnose Android dynamic broadcast receiver usage
+        shell: bash
+        run: |
+          echo "=== PACKAGES REGISTERING DYNAMIC RECEIVERS ==="
+          find "$HOME/.pub-cache" -type f \( -name '*.java' -o -name '*.kt' \) -print0 |
+            xargs -0 grep -nH -E '\.registerReceiver\(|registerReceiver\(' | head -100 || true
+          echo "=== ANDROID PLUGINS / SPECIFIC SOURCES ==="
+          find "$HOME/.pub-cache" -type f \( -name '*.java' -o -name '*.kt' \) -print | grep -E '(radio_player|volume_regulator|back_button_behavior)' | head -90
