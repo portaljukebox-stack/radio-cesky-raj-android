@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-original-small-apk.yml'
+      - 'tools/prepare_original_flutter.py'
   workflow_dispatch:
 jobs:
   build:
@@ -27,17 +28,11 @@ jobs:
           python3 tools/prepare_original_flutter.py
           python3 - <<'PY'
           from pathlib import Path
-          from PIL import Image
-          root=Path('radio_cesky_raj')
-          logo=Image.open(root/'assets/appicon/appicon.png').convert('RGBA')
-          for density,size in [('mdpi',48),('hdpi',72),('xhdpi',96),('xxhdpi',144),('xxxhdpi',192)]:
-            folder=root/f'android/app/src/main/res/mipmap-{density}'
-            folder.mkdir(parents=True,exist_ok=True)
-            logo.resize((size,size), Image.Resampling.LANCZOS).save(folder/'ic_launcher.png')
-          gradle=root/'android/app/build.gradle'
+          gradle=Path('radio_cesky_raj/android/app/build.gradle')
           text=gradle.read_text()
-          text=text.replace('if (keystorePropertiesFile.exists()) {\n                signingConfig signingConfigs.release\n            }', 'signingConfig signingConfigs.debug')
-          gradle.write_text(text)
+          old="if (keystorePropertiesFile.exists()) {\n                signingConfig signingConfigs.release\n            }"
+          assert old in text, "Unexpected signing configuration"
+          gradle.write_text(text.replace(old, "signingConfig signingConfigs.debug"))
           PY
       - name: Build smaller release APKs - identical original Flutter app
         working-directory: radio_cesky_raj
@@ -61,6 +56,27 @@ jobs:
             "$TOOL" verify --verbose "$APK"
             "$AAPT" dump badging "$APK" | grep -E "^(package:|application-label:|native-code:)"
           done
+          python3 - <<'PY'
+          import re,subprocess,zipfile
+          from PIL import Image,ImageChops,ImageStat
+          from io import BytesIO
+          from pathlib import Path
+          apktools=sorted(Path("/usr/local/lib/android/sdk/build-tools").glob("*/aapt"))
+          aapt=str(apktools[-1])
+          expected=Image.open("radio_cesky_raj/assets/appicon/appicon.png").convert("RGB")
+          for apk in Path("result").glob("*.apk"):
+              badging=subprocess.check_output([aapt,"dump","badging",str(apk)],text=True)
+              assert "cz.radioceskyraj.flutter2026" in badging, "Unexpected package id"
+              assert "Rádio Český ráj" in badging, "Wrong app title"
+              icons=re.findall(r"application-icon-\\d+:'([^']+)'",badging)
+              assert icons, "Launcher icons missing"
+              with zipfile.ZipFile(apk) as z:
+                  actual=Image.open(BytesIO(z.read(icons[-1]))).convert("RGB")
+              ref=expected.resize(actual.size,Image.Resampling.LANCZOS)
+              err=sum(ImageStat.Stat(ImageChops.difference(ref,actual)).mean)/3
+              print(apk.name, "launcher pixel difference", round(err,2))
+              assert err < 40, "Android icon is not RCR branding"
+          PY
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
         with:
