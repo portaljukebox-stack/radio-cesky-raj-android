@@ -44,13 +44,13 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(24),dp(34),dp(24),dp(30)); root.setGravity(Gravity.CENTER_HORIZONTAL);
         scroll.addView(root); setContentView(scroll);
-        TextView name = text("RÁDIO ČESKÝ RÁJ", 27, Color.WHITE, true);
+        TextView name = text("RÁDIO ČESKÝ RÁJ", 25, Color.WHITE, true);
         root.addView(name, new LinearLayout.LayoutParams(-1,dp(54)));
-        TextView tagline = text("NÁŠ KRAJ. NAŠE HUDBA. VÁŠ DEN.", 13, green, true);
+        TextView tagline = text("PŘÍBĚHY A HUDBA NAŠEHO KRAJE", 13, green, true);
         root.addView(tagline, new LinearLayout.LayoutParams(-1,dp(36)));
-        ImageView icon = new ImageView(this); icon.setImageResource(R.drawable.radio_icon);
+        ImageView icon = new ImageView(this); icon.setImageResource(R.drawable.radio_icon_exact);
         LinearLayout.LayoutParams imgp = new LinearLayout.LayoutParams(dp(220),dp(220));
-        imgp.topMargin=dp(34);imgp.bottomMargin=dp(26);root.addView(icon,imgp);
+        imgp.topMargin=dp(22);imgp.bottomMargin=dp(22);root.addView(icon,imgp);
         TextView live = text("●   ŽIVÉ VYSÍLÁNÍ", 15, green, true);
         root.addView(live, new LinearLayout.LayoutParams(-1,dp(38)));
         status = text("Připraveno k přehrávání", 16, Color.WHITE, false);
