@@ -36,7 +36,7 @@ jobs:
             logo.resize((size,size), Image.Resampling.LANCZOS).save(folder/'ic_launcher.png')
           gradle=root/'android/app/build.gradle'
           text=gradle.read_text()
-          text=text.replace('signingConfig signingConfigs.release','signingConfig signingConfigs.debug')
+          text=text.replace('if (keystorePropertiesFile.exists()) {\n                signingConfig signingConfigs.release\n            }', 'signingConfig signingConfigs.debug')
           gradle.write_text(text)
           PY
       - name: Build smaller release APKs - identical original Flutter app
