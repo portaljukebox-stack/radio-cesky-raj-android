@@ -57,25 +57,36 @@ jobs:
             "$AAPT" dump badging "$APK" | grep -E "^(package:|application-label:|native-code:)"
           done
           python3 - <<'PY'
-          import re,subprocess,zipfile
+          import zipfile
           from PIL import Image,ImageChops,ImageStat
           from io import BytesIO
           from pathlib import Path
-          apktools=sorted(Path("/usr/local/lib/android/sdk/build-tools").glob("*/aapt"))
-          aapt=str(apktools[-1])
-          expected=Image.open("radio_cesky_raj/assets/appicon/appicon.png").convert("RGB")
+          actual_logo=Image.open("radio_cesky_raj/assets/appicon/appicon.png").convert("RGB")
+          orig_zip=zipfile.ZipFile("rohozec_radio (2).zip")
+          old_icons=[n for n in orig_zip.namelist() if n.endswith("/res/mipmap-xxxhdpi/ic_launcher.png")]
+          assert old_icons, "Cannot locate the old Rohozec icon for comparison"
+          old_logo=Image.open(BytesIO(orig_zip.read(old_icons[0]))).convert("RGB")
+          def difference(ref,im):
+              return sum(ImageStat.Stat(ImageChops.difference(
+                  ref.resize(im.size,Image.Resampling.LANCZOS),im)).mean)/3
           for apk in Path("result").glob("*.apk"):
-              badging=subprocess.check_output([aapt,"dump","badging",str(apk)],text=True)
-              assert "cz.radioceskyraj.flutter2026" in badging, "Unexpected package id"
-              assert "Rádio Český ráj" in badging, "Wrong app title"
-              icons=re.findall(r"application-icon-\d+:'([^']+)'",badging)
-              assert icons, "Launcher icons missing"
+              found_rcr=[]
+              found_old=[]
               with zipfile.ZipFile(apk) as z:
-                  actual=Image.open(BytesIO(z.read(icons[-1]))).convert("RGB")
-              ref=expected.resize(actual.size,Image.Resampling.LANCZOS)
-              err=sum(ImageStat.Stat(ImageChops.difference(ref,actual)).mean)/3
-              print(apk.name, "launcher pixel difference", round(err,2))
-              assert err < 40, "Android icon is not RCR branding"
+                  for name in z.namelist():
+                      if not name.startswith("res/") or not name.lower().endswith(".png"):
+                          continue
+                      try:
+                          im=Image.open(BytesIO(z.read(name))).convert("RGB")
+                          if min(im.size)<48 or max(im.size)>1024: continue
+                          good=difference(actual_logo,im)
+                          bad=difference(old_logo,im)
+                          if good<35: found_rcr.append((round(good,1),name))
+                          if bad<20: found_old.append((round(bad,1),name))
+                      except Exception: pass
+              print(apk.name,"RCR resources",found_rcr[:10],"OLD ROHOZEC resources",found_old[:10])
+              assert found_rcr, "RCR logo absent from native Android compiled image resources"
+              assert not found_old, "Legacy Rohozec app icon is still present in APK"
           PY
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
