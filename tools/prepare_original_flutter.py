@@ -147,7 +147,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.1.0+32", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.2.0+33", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -179,6 +179,19 @@ s = re.sub(r"(?ms)^    signingConfigs \{.*?^    \}\n\n    buildTypes \{.*?^    \
         }
     }""",s)
 write("android/app/build.gradle", s)
+
+# API 35 prevents Android's old-target privacy warning and is compatible
+# with Android 16 (API 36), without pretending this old Flutter 3.7 project
+# has already been migrated to targetSdk 36.
+s=read("android/app/build.gradle")
+s=s.replace("compileSdkVersion 33","compileSdkVersion 35")
+s=s.replace("targetSdkVersion 33","targetSdkVersion 35")
+write("android/app/build.gradle",s)
+gradle_props=read("android/gradle.properties")
+if "android.suppressUnsupportedCompileSdk" not in gradle_props:
+    gradle_props+="\nandroid.suppressUnsupportedCompileSdk=35\n"
+write("android/gradle.properties",gradle_props)
+
 s = read("android/app/src/main/AndroidManifest.xml")
 s = s.replace('android:label="Radio Rohozec"', 'android:label="Rádio Český ráj"')
 s = s.replace('android:label="Rádio Rohozec"', 'android:label="Rádio Český ráj"')
@@ -293,6 +306,106 @@ for p in android_res.rglob("*.png"):
         if rr > gg*1.75 and rr > bb*1.6:
             sys.exit("Old brewery-colored Android asset detected: "+str(p))
 print("ALL Android launcher and splash resources replaced with station artwork")
+
+# Exact user-supplied WIDE radio logo, recovered from GitHub blob
+# and checked using SHA-256 before any APK can be published.
+import hashlib
+full_logo=ROOT/"assets/branding/rcr_full_logo.webp"
+expected_logo_sha="9512a4daa057cd148d1da6562d3f3e41d60d8ce7da683c1d87fd416fdbf1434a"
+if not full_logo.is_file() or hashlib.sha256(full_logo.read_bytes()).hexdigest()!=expected_logo_sha:
+    sys.exit("STOP: Exact full Rádio Český ráj logo missing or modified")
+station_logo=Image.open(full_logo).convert("RGB")
+if station_logo.size!=(600,352):
+    sys.exit("STOP: Incorrect wide logo dimensions")
+station_logo.save(out/"assets/images/rcr_full_logo.png",optimize=True)
+print("FULL RADIO LOGO VERIFIED and installed inside original Flutter assets")
+
+# Fix the player itself: station logo always complete and uncropped.
+# Show the cover of a real song only as a secondary image, when available.
+player=read("lib/screens/player/player_view.dart")
+old_player="""          const ExpandedBox(flex: 2, minHeight: 20),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 500),
+            child: _Cover(
+              key: viewModel.artwork?.key,
+              size: MediaQuery.of(context).size.width - padding * 2,
+              image: viewModel.artwork ??
+                  Image.asset(
+                    'assets/appicon/appicon.png',
+                    fit: BoxFit.cover,
+                  ),
+            ),
+          ),
+          const ExpandedBox(flex: 4, minHeight: 40),"""
+new_player="""          const SizedBox(height: 18),
+          AspectRatio(
+            aspectRatio: 600 / 352,
+            child: Image.asset(
+              'assets/images/rcr_full_logo.png',
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (viewModel.artwork != null) ...[
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 450),
+              child: _Cover(
+                key: viewModel.artwork?.key,
+                size: (MediaQuery.of(context).size.width - padding * 2) * 0.59,
+                image: viewModel.artwork!,
+              ),
+            ),
+            const SizedBox(height: 15),
+          ],
+          const SizedBox(height: 22),"""
+if old_player not in player:
+    sys.exit("STOP: Original Flutter player structure changed; no UI replacement attempted")
+player=player.replace(old_player,new_player)
+write("lib/screens/player/player_view.dart",player)
+
+# Search iTunes only for plausible musician/song pairs. News, fairy tales
+# and regional programmes must never display a misleading album cover.
+vm=read("lib/screens/player/player_viewmodel.dart")
+old_metadata="""      log(metadata.toString());
+      metadata = value;
+      if (Config.showAlbumCover) artwork = await _radioPlayer.getArtworkImage();
+      notifyListeners();"""
+new_metadata="""      metadata = value;
+      final requestId = ++_artworkRequestId;
+      artwork = null;
+      notifyListeners();
+      if (!Config.showAlbumCover || value.length < 2) return;
+      final artistName = value[0].trim().toLowerCase();
+      final trackName = value[1].trim().toLowerCase();
+      final fullName = '$artistName $trackName';
+      const nonMusic = [
+        'rádio český ráj', 'radio cesky raj', 'hřídelecká',
+        'kozákovská čarodějka', 'zprávy', 'jmeniny', 'počasí',
+        'dobrá rada', 'večer s příběhem', 'příběh', 'pohádka',
+        'víte, že', 'z českého ráje', 'sport českého ráje',
+        'rozhovor', 'pozvánka', 'regionální',
+      ];
+      if (artistName.isEmpty || trackName.isEmpty ||
+          artistName == trackName ||
+          nonMusic.any((phrase) => fullName.contains(phrase))) {
+        return;
+      }
+      try {
+        final cover = await _radioPlayer.getArtworkImage();
+        if (requestId != _artworkRequestId) return;
+        artwork = cover;
+        notifyListeners();
+      } catch (error) {
+        log('Artwork lookup unavailable: $error');
+      }"""
+if old_metadata not in vm:
+    sys.exit("STOP: Original metadata listener changed")
+vm=vm.replace("  Image? artwork;", "  Image? artwork;\n  int _artworkRequestId = 0;", 1)
+vm=vm.replace(old_metadata,new_metadata)
+write("lib/screens/player/player_viewmodel.dart",vm)
+print("Original player now uses exact wide station logo + optional real music artwork")
+
 
 
 # Keep the proven original Flutter player unchanged in this privacy-screen fix.
