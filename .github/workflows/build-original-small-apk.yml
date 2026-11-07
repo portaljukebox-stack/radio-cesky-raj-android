@@ -1,0 +1,82 @@
+name: Mala originalni Android APK - Radio Cesky raj
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-original-small-apk.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.7.12'
+          channel: stable
+          cache: true
+      - name: Prepare same original Flutter application
+        run: |
+          python3 -m pip install --user Pillow==12.0.0
+          python3 tools/prepare_original_flutter.py
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          root=Path('radio_cesky_raj')
+          logo=Image.open(root/'assets/appicon/appicon.png').convert('RGBA')
+          for density,size in [('mdpi',48),('hdpi',72),('xhdpi',96),('xxhdpi',144),('xxxhdpi',192)]:
+            folder=root/f'android/app/src/main/res/mipmap-{density}'
+            folder.mkdir(parents=True,exist_ok=True)
+            logo.resize((size,size), Image.Resampling.LANCZOS).save(folder/'ic_launcher.png')
+          gradle=root/'android/app/build.gradle'
+          text=gradle.read_text()
+          text=text.replace('signingConfig signingConfigs.release','signingConfig signingConfigs.debug')
+          gradle.write_text(text)
+          PY
+      - name: Build smaller release APKs - identical original Flutter app
+        working-directory: radio_cesky_raj
+        run: |
+          flutter pub get
+          flutter build apk --release --split-per-abi --no-pub
+      - name: Validate APKs, names and signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p result
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_ARM64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_ARM32.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_X86_64.apk
+          TOOL=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          for APK in result/*.apk; do
+            echo "CHECK $APK"
+            stat -c '%n %s bytes' "$APK"
+            test "$(stat -c %s "$APK")" -gt 8000000
+            "$TOOL" verify --verbose "$APK"
+            "$AAPT" dump badging "$APK" | grep -E "^(package:|application-label:|native-code:)"
+          done
+          sha256sum result/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCR_Originalni_Aplikace_ARM64
+          path: result/Radio_Cesky_Raj_ARM64.apk
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCR_Originalni_Aplikace_ARM32
+          path: result/Radio_Cesky_Raj_ARM32.apk
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCR_Originalni_Aplikace_X86_64
+          path: result/Radio_Cesky_Raj_X86_64.apk
+          if-no-files-found: error
+          retention-days: 30
