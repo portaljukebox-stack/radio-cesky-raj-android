@@ -68,7 +68,7 @@ jobs:
               badging=subprocess.check_output([aapt,"dump","badging",str(apk)],text=True)
               assert "cz.radioceskyraj.flutter2026" in badging, "Unexpected package id"
               assert "Rádio Český ráj" in badging, "Wrong app title"
-              icons=re.findall(r"application-icon-\\d+:'([^']+)'",badging)
+              icons=re.findall(r"application-icon-\d+:'([^']+)'",badging)
               assert icons, "Launcher icons missing"
               with zipfile.ZipFile(apk) as z:
                   actual=Image.open(BytesIO(z.read(icons[-1]))).convert("RGB")
