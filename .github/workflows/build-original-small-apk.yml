@@ -25,6 +25,7 @@ jobs:
       - name: Prepare same original Flutter application
         run: |
           python3 -m pip install --user Pillow==12.0.0
+          python3 tools/verify_logo.py
           python3 tools/prepare_original_flutter.py
           python3 - <<'PY'
           from pathlib import Path
@@ -87,6 +88,21 @@ jobs:
               print(apk.name,"RCR resources",found_rcr[:10],"OLD ROHOZEC resources",found_old[:10])
               assert found_rcr, "RCR logo absent from native Android compiled image resources"
               assert not found_old, "Legacy Rohozec app icon is still present in APK"
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,hashlib,subprocess
+          full=Path("radio_cesky_raj/assets/images/rcr_full_logo.png").read_bytes()
+          logo_hash=hashlib.sha256(full).hexdigest()
+          aapt=str(sorted(Path("/usr/local/lib/android/sdk/build-tools").glob("*/aapt"))[-1])
+          for apk in Path("result").glob("*.apk"):
+              with zipfile.ZipFile(apk) as z:
+                  names=[name for name in z.namelist() if name.endswith("assets/images/rcr_full_logo.png")]
+                  assert names, "STOP: Complete station logo missing from Flutter APK"
+                  assert hashlib.sha256(z.read(names[0])).hexdigest()==logo_hash, "Logo mismatch in APK"
+              out=subprocess.check_output([aapt,"dump","badging",str(apk)],text=True)
+              assert "targetSdkVersion:'35'" in out, "APK is still targeting obsolete Android"
+              print(apk.name,"Complete station logo included, Android target SDK 35 confirmed")
           PY
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
