@@ -1,0 +1,42 @@
+name: Reproduce actual Android 16 crash and report Java exception
+on:
+  push:
+    paths: ['.github/workflows/reproduce-crash.yml']
+  workflow_dispatch:
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RCR_Originalni_Aplikace_X86_64
+          run-id: 42408562048
+          github-token: ${{ github.token }}
+          path: apk
+      - name: Start app on Android 15 and capture crash
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install apk/Radio_Cesky_Raj_X86_64.apk
+            adb logcat -c
+            adb shell am start -n cz.radioceskyraj.flutter2026/com.cheebeez.single_radio.MainActivity
+            sleep 12
+            echo '==== RELEVANT ANDROID EXCEPTIONS ===='
+            adb logcat -d -v time | grep -B 6 -A 55 -E 'SecurityException|FATAL EXCEPTION|Process: cz.radioceskyraj.flutter2026|RECEIVER_EXPORTED' | tail -180 || true
+            echo '==== APP STATUS ===='
+            adb shell pidof cz.radioceskyraj.flutter2026 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crash-analysis
+          path: apk/Radio_Cesky_Raj_X86_64.apk
+          retention-days: 1
