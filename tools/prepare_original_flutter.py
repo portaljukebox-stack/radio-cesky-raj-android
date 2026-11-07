@@ -96,12 +96,15 @@ write("lib/widgets/sidebar.dart", s)
 s = read("lib/widgets/sidebar.dart")
 s = s.replace("import 'package:single_radio/widgets/markdown.dart';\n",
               "import 'package:single_radio/screens/privacy/privacy_view.dart';\n")
-privacy_start = s.find("          showDialog(")
-privacy_end = s.find("\n            },\n          ),", privacy_start)
-if privacy_start < 0 or privacy_end < 0:
-    sys.exit("STOP: privacy dialog navigation in original Sidebar not recognized")
-# The onTap closes Drawer first, then pushes a regular MaterialPageRoute.
-s = s[:privacy_start] + "          Navigator.pushNamed(context, PrivacyView.routeName);" + s[privacy_end:]
+# Replace the onTap show's Dialog; do not alter any other sidebar item.
+s, privacy_changes = re.subn(
+    r"(?ms)^          showDialog\\(.*?^          \\);",
+    "          Navigator.pushNamed(context, PrivacyView.routeName);",
+    s,
+    count=1,
+)
+if privacy_changes != 1:
+    sys.exit("STOP: original privacy Dialog not found; do not write sidebar")
 write("lib/widgets/sidebar.dart", s)
 
 s = read("lib/main.dart")
@@ -109,15 +112,15 @@ import_anchor = "import 'package:single_radio/screens/about/about_view.dart';"
 if import_anchor not in s:
     sys.exit("STOP: original Flutter router was changed")
 s = s.replace(import_anchor,
-    import_anchor + "\\nimport 'package:single_radio/screens/privacy/privacy_view.dart';")
+    import_anchor + "\nimport 'package:single_radio/screens/privacy/privacy_view.dart';")
 route_anchor = "      case AboutView.routeName:"
 if route_anchor not in s:
     sys.exit("STOP: cannot find original AboutView navigation")
 s = s.replace(route_anchor,
-    "      case PrivacyView.routeName:\\n"
-    "        return MaterialPageRoute(\\n"
-    "          builder: (context) => const PrivacyView(),\\n"
-    "        );\\n" + route_anchor)
+    "      case PrivacyView.routeName:\n"
+    "        return MaterialPageRoute(\n"
+    "          builder: (context) => const PrivacyView(),\n"
+    "        );\n" + route_anchor)
 write("lib/main.dart", s)
 
 privacy_template = ROOT / "tools/templates/privacy_view.dart"
