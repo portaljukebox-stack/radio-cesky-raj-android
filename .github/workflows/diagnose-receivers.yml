@@ -29,6 +29,12 @@ jobs:
       - name: Diagnose Android dynamic broadcast receiver usage
         shell: bash
         run: |
+          echo '=== RADIO PLAYER GRADLE DEPENDENCIES ==='
+          cat "$HOME/.pub-cache/hosted/pub.dev/radio_player-1.2.1/android/build.gradle"
+          echo '=== VOLUME REGULATOR GRADLE DEPENDENCIES ==='
+          cat "$HOME/.pub-cache/hosted/pub.dev/volume_regulator-2.1.0/android/build.gradle"
+          echo '=== RADIO PLAYER SERVICE ==='
+          sed -n '1,260p' "$HOME/.pub-cache/hosted/pub.dev/radio_player-1.2.1/android/src/main/kotlin/com/cheebeez/radio_player/RadioPlayerService.kt"
           echo "=== PACKAGES REGISTERING DYNAMIC RECEIVERS ==="
           find "$HOME/.pub-cache" -type f \( -name '*.java' -o -name '*.kt' \) -print0 |
             xargs -0 grep -nH -E '\.registerReceiver\(|registerReceiver\(' | head -100 || true
