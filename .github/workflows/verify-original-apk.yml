@@ -1,0 +1,38 @@
+name: Overeni instalace puvodni aplikace Android
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-original-apk.yml'
+  workflow_dispatch:
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified original Flutter APK from successful build
+        uses: actions/download-artifact@v4
+        with:
+          name: Radio_Cesky_Raj_PUVODNI_FLUTTER_APK
+          run-id: 42365010994
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: apk
+      - name: Check downloaded application package
+        run: |
+          ls -lh apk/
+          test -s apk/Radio_Cesky_Raj_PUVODNI_FLUTTER.apk
+      - name: Install and launch original Flutter app in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r apk/Radio_Cesky_Raj_PUVODNI_FLUTTER.apk
+            adb shell am start -n cz.radioceskyraj.original/com.cheebeez.single_radio.MainActivity
+            sleep 7
+            adb shell pidof cz.radioceskyraj.original
