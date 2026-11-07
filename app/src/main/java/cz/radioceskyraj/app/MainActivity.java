@@ -80,6 +80,10 @@ public class MainActivity extends Activity {
     }
     @Override protected void onStart() {
         super.onStart();
+        String state = RadioService.currentState;
+        status.setText(state);
+        playing = state.equals("Hraje živě") || state.equals("Připojování…");
+        play.setText(playing ? "■   ZASTAVIT VYSÍLÁNÍ" : "▶   PŘEHRÁT ŽIVĚ");
         IntentFilter f = new IntentFilter(RadioService.ACTION_STATE);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(receiver,f);
