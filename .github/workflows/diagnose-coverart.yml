@@ -1,0 +1,48 @@
+name: Diagnose official MediaCP cover art JSON
+on:
+  push:
+    paths: ['.github/workflows/diagnose-coverart.yml']
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe publicly accessible MediaCP JSON endpoints
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,urllib.request,urllib.error,ssl
+          urls=[
+            'https://portal.juke-box.cz:2020/json/stream/radioceskyraj',
+            'https://portal.juke-box.cz/json/stream/radioceskyraj',
+            'https://portal.juke-box.cz:2020/json/stream/2020',
+            'https://portal.juke-box.cz/json/stream/2020',
+            'https://portal.juke-box.cz:2020/json/stream/radio-cesky-raj',
+            'https://portal.juke-box.cz:2020/api/nowplaying/radioceskyraj',
+            'https://portal.juke-box.cz:2020/status-json.xsl',
+            'https://portal.juke-box.cz:2020/stream/radioceskyraj',
+            'https://portal.juke-box.cz:2020/',
+            'https://portal.juke-box.cz/',
+          ]
+          for url in urls:
+            print('\n=== URL:',url,flush=True)
+            try:
+              req=urllib.request.Request(url,headers={'User-Agent':'RCR-App-Integration-Check/1.0','Accept':'application/json,text/plain,*/*'})
+              with urllib.request.urlopen(req,timeout=7) as r:
+                print('STATUS:',r.status,'TYPE:',r.headers.get('content-type'),'FINAL:',r.url)
+                t=r.headers.get('content-type','').lower()
+                if any(x in t for x in ('json','text/','html')):
+                  raw=r.read(8192).decode('utf-8','replace')
+                  if 'json' in t or raw[:1] in '[{':
+                    try:print('PUBLIC_JSON:',json.dumps(json.loads(raw),ensure_ascii=False)[:6500])
+                    except:print('BODY:',raw[:1000])
+                  else:
+                    import re
+                    print('PAGE_SNIPPET:',re.sub('<[^>]+>',' ',raw)[:500])
+                else:
+                  print('NON_TEXT_STREAM')
+            except Exception as e:
+              print('ERROR:',str(e)[:240])
+          PY
