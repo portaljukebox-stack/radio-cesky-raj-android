@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:single_radio/config.dart';
 import 'package:single_radio/screens/player/player_viewmodel.dart';
+import 'package:single_radio/screens/player/mediacp_cover.dart';
 import 'package:single_radio/theme.dart';
 import 'package:single_radio/widgets/screen.dart';
 import 'package:text_scroll/text_scroll.dart';
@@ -90,12 +91,7 @@ class _PlayerViewState extends State<PlayerView> {
                           const SizedBox(height: 9),
                           Expanded(
                             child: Center(
-                              child: Image.asset(
-                                'assets/images/rcr_full_logo.png',
-                                width: double.infinity,
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.high,
-                              ),
+                              child: const MediaCpCover(),
                             ),
                           ),
                         ],
@@ -116,17 +112,6 @@ class _PlayerViewState extends State<PlayerView> {
             ),
             child: Row(
               children: [
-                if (viewModel.artwork != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(11),
-                    child: SizedBox(
-                      height: 56,
-                      width: 56,
-                      child: viewModel.artwork!,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
                 Expanded(
                   child: _TrackInformation(
                     artist: viewModel.artist,
