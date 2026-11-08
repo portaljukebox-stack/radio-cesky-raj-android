@@ -433,8 +433,8 @@ for template, destination in [
     if not template_path.is_file():
         sys.exit("STOP: Missing original-app layout template: "+template)
     source=template_path.read_text(encoding="utf-8")
-    if destination.endswith("player_view.dart") and "rcr_full_logo.png" not in source:
-        sys.exit("STOP: Player logo source missing")
+    if destination.endswith("player_view.dart") and "MediaCpCover()" not in source:
+        sys.exit("STOP: Player MediaCP artwork component missing")
     if destination.endswith("about_view.dart") and "rcr_full_logo.png" not in source:
         sys.exit("STOP: About logo source missing")
     write(destination, source)
