@@ -147,7 +147,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.2.1+34", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.3.0+35", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -421,6 +421,24 @@ vm=vm.replace("  Image? artwork;", "  Image? artwork;\n  int _artworkRequestId =
 vm=vm.replace(old_metadata,new_metadata)
 write("lib/screens/player/player_viewmodel.dart",vm)
 print("Original player now uses exact wide station logo + optional real music artwork")
+
+# Apply professionally balanced Flutter screens after original audio/metadata logic.
+# This preserves the original PlayerViewModel and all service code.
+for template, destination in [
+    ("tools/templates/player_view.dart", "lib/screens/player/player_view.dart"),
+    ("tools/templates/about_view.dart", "lib/screens/about/about_view.dart"),
+]:
+    template_path=ROOT/template
+    if not template_path.is_file():
+        sys.exit("STOP: Missing original-app layout template: "+template)
+    source=template_path.read_text(encoding="utf-8")
+    if destination.endswith("player_view.dart") and "rcr_full_logo.png" not in source:
+        sys.exit("STOP: Player logo source missing")
+    if destination.endswith("about_view.dart") and "rcr_full_logo.png" not in source:
+        sys.exit("STOP: About logo source missing")
+    write(destination, source)
+print("REDESIGNED: centered main player and premium About page, original audio service preserved")
+
 
 
 
