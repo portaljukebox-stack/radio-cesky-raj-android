@@ -52,8 +52,9 @@ write("lib/config.dart", """class Config {
   static const shareText = 'Poslouchám Rádio Český ráj. https://www.radioceskyraj.cz/';
   static const appStoreId = '0123456789';
   static const autoplay = false;
-  static const showAlbumCover = true;
-  static const albumCoverFromItunes = true;
+  // MediaCP is the single authoritative artwork source; no iTunes mismatch.
+  static const showAlbumCover = false;
+  static const albumCoverFromItunes = false;
   static const textScrolling = true;
   static const metadataUrl = '';
   static const artistTag = 'artist';
@@ -147,7 +148,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.3.0+35", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.4.0+36", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -437,6 +438,16 @@ for template, destination in [
     if destination.endswith("about_view.dart") and "rcr_full_logo.png" not in source:
         sys.exit("STOP: About logo source missing")
     write(destination, source)
+# Public MediaCP cover-art fetcher; full RCR logo on invalid/missing cover.
+cover_template = ROOT / "tools/templates/mediacp_cover.dart"
+if not cover_template.is_file():
+    sys.exit("STOP: MediaCP cover widget is missing")
+cover_source = cover_template.read_text(encoding="utf-8")
+assert "json/stream/radioceskyraj" in cover_source
+assert "rcr_full_logo.png" in cover_source
+write("lib/screens/player/mediacp_cover.dart", cover_source)
+assert "MediaCpCover()" in read("lib/screens/player/player_view.dart")
+print("OFFICIAL MEDIACP COVER ART ENABLED with fallback, original radio playback untouched")
 print("REDESIGNED: centered main player and premium About page, original audio service preserved")
 
 
