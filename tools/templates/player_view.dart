@@ -7,7 +7,9 @@ import 'package:single_radio/screens/player/player_viewmodel.dart';
 import 'package:single_radio/screens/player/mediacp_cover.dart';
 import 'package:single_radio/screens/timer/timer_view.dart';
 import 'package:single_radio/theme.dart';
-import 'package:single_radio/widgets/screen.dart';
+import 'package:back_button_behavior/back_button_behavior.dart';
+import 'package:single_radio/widgets/sidebar.dart';
+import 'package:single_radio/screens/about/about_view.dart';
 import 'package:text_scroll/text_scroll.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -43,6 +45,9 @@ class _PlayerViewState extends State<PlayerView>
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+
+  // COOL_VISUAL_VERSION_2_6: a dedicated native radio screen with an
+  // unmistakably different top bar, atmospheric cover and bottom navigation.
   @override
   Widget build(BuildContext context) {
     if (viewModel.isPlaying && !_equalizerController.isAnimating) {
@@ -52,64 +57,388 @@ class _PlayerViewState extends State<PlayerView>
     }
 
     final media = MediaQuery.of(context);
-    final compact = media.size.height < 760;
-    final artworkSize = math
-        .min(media.size.width - 92, compact ? 226.0 : 276.0)
+    final compact = media.size.height < 775;
+    final coverSize = math
+        .min(media.size.width - 90, compact ? 205.0 : 272.0)
         .toDouble();
-    final availableHeight = media.size.height -
-        media.padding.top -
-        media.padding.bottom -
-        kToolbarHeight -
-        38;
-    final targetHeight = math.max(560.0, availableHeight).toDouble();
 
-    return Screen(
-      title: Config.title,
-      home: true,
-      hideOverscrollIndicator: true,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final bodyHeight = constraints.maxHeight.isFinite
-              ? math.max(targetHeight, constraints.maxHeight).toDouble()
-              : targetHeight;
+    return BackButtonBehavior(
+      onBackTap: BackButtonAction.minimize,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF07111B),
+        drawer: Sidebar(),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 17),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _CoolTopBar(isPlaying: viewModel.isPlaying),
+                        const SizedBox(height: 16),
+                        _AtmosphericCover(
+                          size: coverSize,
+                          isPlaying: viewModel.isPlaying,
+                          animation: _equalizerController,
+                        ),
+                        const SizedBox(height: 18),
+                        _NowPlayingCard(
+                          artist: viewModel.artist,
+                          track: viewModel.track,
+                          isPlaying: viewModel.isPlaying,
+                          play: viewModel.play,
+                          pause: viewModel.pause,
+                        ),
+                        const SizedBox(height: 16),
+                        _VolumeControl(
+                          volume: viewModel.volume,
+                          onChanged: viewModel.setVolume,
+                        ),
+                        const SizedBox(height: 12),
+                        const _BrandFooter(),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF0D1C2B),
+              border: Border(
+                top: BorderSide(color: Color(0xFF2A4654), width: 1),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 5, 6, 7),
+              child: Row(
+                children: [
+                  _CoolNavItem(
+                    icon: Icons.headphones_rounded,
+                    label: 'Poslech',
+                    selected: true,
+                    onTap: () {},
+                  ),
+                  _CoolNavItem(
+                    icon: Icons.timer_outlined,
+                    label: 'Časovač',
+                    onTap: () => Navigator.pushNamed(
+                      context, TimerView.routeName,
+                    ),
+                  ),
+                  _CoolNavItem(
+                    icon: Icons.auto_stories_outlined,
+                    label: 'Rájoviny',
+                    onTap: () => _openWebsite(Config.partnerWebsite),
+                  ),
+                  _CoolNavItem(
+                    icon: Icons.info_outline_rounded,
+                    label: 'O rádiu',
+                    onTap: () => Navigator.pushNamed(
+                      context, AboutView.routeName,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-          return ConstrainedBox(
-            constraints: BoxConstraints(minHeight: bodyHeight),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+}
+
+
+class _CoolTopBar extends StatelessWidget {
+  const _CoolTopBar({required this.isPlaying});
+  final bool isPlaying;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Material(
+          color: const Color(0xFF142A3C),
+          borderRadius: BorderRadius.circular(15),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: () => Scaffold.of(context).openDrawer(),
+            child: const SizedBox(
+              width: 49,
+              height: 49,
+              child: Icon(Icons.menu_rounded, size: 25, color: Colors.white),
+            ),
+          ),
+        ),
+        const SizedBox(width: 13),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'RÁDIO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  letterSpacing: 0.4,
+                  height: 1.08,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                'ČESKÝ RÁJ',
+                style: TextStyle(
+                  color: Color(0xFFA8E820),
+                  fontSize: 12,
+                  letterSpacing: 3,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: isPlaying
+                ? const Color(0xFF20422B)
+                : const Color(0xFF1B2938),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: isPlaying
+                  ? const Color(0xFFA6E81C)
+                  : const Color(0xFF344C60),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isPlaying
+                      ? const Color(0xFFA6E81C)
+                      : const Color(0xFF8393A1),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isPlaying ? 'ON AIR' : 'OFFLINE',
+                style: TextStyle(
+                  color: isPlaying
+                      ? const Color(0xFFA6E81C)
+                      : const Color(0xFFB6C5D2),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AtmosphericCover extends StatelessWidget {
+  const _AtmosphericCover({
+    required this.size,
+    required this.isPlaying,
+    required this.animation,
+  });
+
+  final double size;
+  final bool isPlaying;
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: size + 88,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(31),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF18384B),
+            Color(0xFF122435),
+            Color(0xFF07121D),
+          ],
+        ),
+        border: Border.all(
+          color: const Color(0xFF56866C).withOpacity(0.5),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF64B66C).withOpacity(0.10),
+            spreadRadius: 1,
+            blurRadius: 36,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              top: -size * 0.40,
+              right: -size * 0.30,
+              child: Container(
+                width: size * 1.05,
+                height: size * 1.05,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFFA6E81C).withOpacity(0.18),
+                      const Color(0xFF00C5A4).withOpacity(0.04),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -size * 0.60,
+              left: -size * 0.38,
+              child: Container(
+                width: size * 1.30,
+                height: size * 1.30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF13B39A).withOpacity(0.20),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _BroadcastHeader(
-                  isPlaying: viewModel.isPlaying,
-                  animation: _equalizerController,
+                const SizedBox(height: 13),
+                Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.12),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.30),
+                        blurRadius: 25,
+                        offset: const Offset(0, 13),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: const ColoredBox(
+                      color: Color(0xFF070D16),
+                      child: MediaCpCover(),
+                    ),
+                  ),
                 ),
-                Center(
-                  child: _ArtworkCard(size: artworkSize),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'RÁDIO ČESKÝ RÁJ',
+                      style: TextStyle(
+                        color: Color(0xFFD8E7EF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2.0,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    _Equalizer(
+                      animation: animation,
+                      isPlaying: isPlaying,
+                      height: 19,
+                    ),
+                  ],
                 ),
-                _NowPlayingCard(
-                  artist: viewModel.artist,
-                  track: viewModel.track,
-                  isPlaying: viewModel.isPlaying,
-                  play: viewModel.play,
-                  pause: viewModel.pause,
-                ),
-                _VolumeControl(
-                  volume: viewModel.volume,
-                  onChanged: viewModel.setVolume,
-                ),
-                _QuickActions(
-                  onTimer: () {
-                    Navigator.pushNamed(context, TimerView.routeName);
-                  },
-                  onPartner: () => _openWebsite(Config.partnerWebsite),
-                  onWebsite: () => _openWebsite(Config.website),
-                ),
-                const _BrandFooter(),
+                const SizedBox(height: 10),
               ],
             ),
-          );
-        },
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoolNavItem extends StatelessWidget {
+  const _CoolNavItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected
+        ? const Color(0xFFA6E81C)
+        : const Color(0xFFA2B4C3);
+    return Expanded(
+      child: Material(
+        color: selected
+            ? const Color(0xFF1B3441)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: 58,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 23, color: color),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
