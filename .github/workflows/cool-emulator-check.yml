@@ -1,0 +1,48 @@
+name: Screenshot COOL UI on Android Emulator
+on:
+  push:
+    branches: [cool-visual-test]
+    paths:
+      - '.github/workflows/cool-emulator-check.yml'
+  workflow_dispatch:
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RCR_COOL_TEST_X86_64
+          run-id: 42659132956
+          github-token: ${{ github.token }}
+          path: apk
+      - name: Boot Android 15 and photograph first screen
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r apk/Radio_Cesky_Raj_COOL_X86_64.apk
+            adb logcat -c
+            adb shell am start -n cz.radioceskyraj.cooltest/com.cheebeez.single_radio.MainActivity
+            sleep 12
+            mkdir -p screenshots
+            adb shell screencap -p /sdcard/rcr-cool.png
+            adb pull /sdcard/rcr-cool.png screenshots/RCR_COOL_ANDROID15.png
+            echo '== APP PROCESS =='
+            adb shell pidof cz.radioceskyraj.cooltest || true
+            echo '== FATAL ERRORS =='
+            adb logcat -d | grep -B 3 -A 16 -E 'FATAL EXCEPTION|SecurityException|E/flutter' | tail -100 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RCR_COOL_SCREENSHOT_ANDROID15
+          path: screenshots/
+          retention-days: 7
