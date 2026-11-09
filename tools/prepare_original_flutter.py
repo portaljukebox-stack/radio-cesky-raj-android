@@ -108,41 +108,8 @@ if privacy_changes != 1:
     sys.exit("STOP: original privacy Dialog not found; do not write sidebar")
 write("lib/widgets/sidebar.dart", s)
 
-# Use the full official horizontal station logo in the navigation drawer.
-# The app icon is square; the wordmark must remain uncropped and readable.
-s = read("lib/widgets/sidebar.dart")
-sidebar_logo_pattern = r"""(?ms)          ClipRRect\(
-\s*borderRadius: BorderRadius\.circular\(18\),
-\s*child: Image\.asset\(
-\s*'assets/images/sidebar\.png',
-\s*width: 76,
-\s*height: 76,
-\s*fit: BoxFit\.cover,
-\s*\),
-\s*\),"""
-sidebar_logo_replacement = """          Container(
-            width: 188,
-            height: 104,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF080C13),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: AppTheme.accentColor.withOpacity(0.25),
-              ),
-            ),
-            child: Image.asset(
-              'assets/images/rcr_full_logo.png',
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.high,
-            ),
-          ),"""
-s, sidebar_logo_changes = re.subn(
-    sidebar_logo_pattern, sidebar_logo_replacement, s, count=1
-)
-if sidebar_logo_changes != 1:
-    sys.exit("STOP: Original drawer logo block changed; refusing an uncertain replacement.")
-write("lib/widgets/sidebar.dart", s)
+# Sidebar artwork is already replaced with the station icon by the
+# existing verified asset-generation block above. Keep its original layout.
 
 s = read("lib/main.dart")
 import_anchor = "import 'package:single_radio/screens/about/about_view.dart';"
