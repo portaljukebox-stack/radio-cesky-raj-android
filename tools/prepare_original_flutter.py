@@ -108,6 +108,42 @@ if privacy_changes != 1:
     sys.exit("STOP: original privacy Dialog not found; do not write sidebar")
 write("lib/widgets/sidebar.dart", s)
 
+# Use the full official horizontal station logo in the navigation drawer.
+# The app icon is square; the wordmark must remain uncropped and readable.
+s = read("lib/widgets/sidebar.dart")
+sidebar_logo_pattern = r"""(?ms)          ClipRRect\(
+\s*borderRadius: BorderRadius\.circular\(18\),
+\s*child: Image\.asset\(
+\s*'assets/images/sidebar\.png',
+\s*width: 76,
+\s*height: 76,
+\s*fit: BoxFit\.cover,
+\s*\),
+\s*\),"""
+sidebar_logo_replacement = """          Container(
+            width: 188,
+            height: 104,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF080C13),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppTheme.accentColor.withOpacity(0.25),
+              ),
+            ),
+            child: Image.asset(
+              'assets/images/rcr_full_logo.png',
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+            ),
+          ),"""
+s, sidebar_logo_changes = re.subn(
+    sidebar_logo_pattern, sidebar_logo_replacement, s, count=1
+)
+if sidebar_logo_changes != 1:
+    sys.exit("STOP: Original drawer logo block changed; refusing an uncertain replacement.")
+write("lib/widgets/sidebar.dart", s)
+
 s = read("lib/main.dart")
 import_anchor = "import 'package:single_radio/screens/about/about_view.dart';"
 if import_anchor not in s:
@@ -148,7 +184,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.4.0+36", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.5.0+37", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -462,5 +498,5 @@ for test in ["lib/config.dart", "assets/text/about.md", "assets/text/privacy_pol
 assert (out/"lib/screens/player/player_view.dart").is_file()
 assert (out/"lib/screens/timer/timer_view.dart").is_file()
 print("ORIGINAL FLUTTER APP READY:",out)
-print("UNCHANGED screens: player, timer, about")
+print("Original audio engine and timer preserved; premium player and About screens installed.")
 print("Original signing and Firebase credential files excluded.")

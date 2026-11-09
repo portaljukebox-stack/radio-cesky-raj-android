@@ -5,12 +5,14 @@ import 'package:provider/provider.dart';
 import 'package:single_radio/config.dart';
 import 'package:single_radio/screens/player/player_viewmodel.dart';
 import 'package:single_radio/screens/player/mediacp_cover.dart';
+import 'package:single_radio/screens/timer/timer_view.dart';
 import 'package:single_radio/theme.dart';
 import 'package:single_radio/widgets/screen.dart';
 import 'package:text_scroll/text_scroll.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Redesigned layout of the ORIGINAL player. The radio engine, timer,
-/// streaming and external navigation remain unchanged.
+/// Premium player UI for Rádio Český ráj.
+/// The original PlayerViewModel and radio playback service are unchanged.
 class PlayerView extends StatefulWidget {
   const PlayerView({super.key});
   static const routeName = '/';
@@ -19,95 +21,131 @@ class PlayerView extends StatefulWidget {
   State<PlayerView> createState() => _PlayerViewState();
 }
 
-class _PlayerViewState extends State<PlayerView> {
-  late final viewModel = Provider.of<PlayerViewModel>(context, listen: true);
+class _PlayerViewState extends State<PlayerView>
+    with SingleTickerProviderStateMixin {
+  late final PlayerViewModel viewModel =
+      Provider.of<PlayerViewModel>(context, listen: true);
+
+  late final AnimationController _equalizerController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 950),
+  );
+
+  @override
+  void dispose() {
+    _equalizerController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openWebsite(String address) async {
+    await launchUrl(
+      Uri.parse(address),
+      mode: LaunchMode.externalApplication,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    // The equalizer moves only while the radio is playing.
+    if (viewModel.isPlaying && !_equalizerController.isAnimating) {
+      _equalizerController.repeat();
+    } else if (!viewModel.isPlaying && _equalizerController.isAnimating) {
+      _equalizerController.stop();
+    }
+
+    final heroHeight =
+        math.min(MediaQuery.of(context).size.width * 0.84, 320.0).toDouble();
+
     return Screen(
       title: Config.title,
       home: true,
       hideOverscrollIndicator: true,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
           const SizedBox(height: 12),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth;
-                final maxHeight = constraints.maxHeight;
-                final heroHeight = math.max(
-                  100.0,
-                  math.min(315.0,
-                    math.min(width * 0.79, maxHeight - 38.0)),
-                );
-
-                return Center(
-                  child: Container(
-                    width: double.infinity,
-                    height: heroHeight,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF080C13),
-                      border: Border.all(
-                        color: AppTheme.accentColor.withOpacity(0.23),
-                        width: 1,
+          Container(
+            width: double.infinity,
+            height: heroHeight,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1B3041),
+                  Color(0xFF101A27),
+                  Color(0xFF080C13),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: AppTheme.accentColor.withOpacity(0.30),
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x35000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 11),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 15, 16, 13),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _LivePill(isPlaying: viewModel.isPlaying),
+                      const Icon(
+                        Icons.graphic_eq_rounded,
+                        color: AppTheme.accentColor,
+                        size: 23,
                       ),
-                      borderRadius: BorderRadius.circular(23),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x35000000),
-                          blurRadius: 22,
-                          offset: Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 19),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: const BoxDecoration(
-                                  color: AppTheme.accentColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 7),
-                              const Text('ŽIVÉ VYSÍLÁNÍ',
-                                style: TextStyle(
-                                  color: AppTheme.accentColor,
-                                  fontSize: 10,
-                                  letterSpacing: 1.4,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 9),
-                          Expanded(
-                            child: Center(
-                              child: const MediaCpCover(),
-                            ),
-                          ),
-                        ],
+                    ],
+                  ),
+                  const SizedBox(height: 11),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(17),
+                      child: Container(
+                        width: double.infinity,
+                        color: const Color(0xFF080C13),
+                        padding: const EdgeInsets.all(8),
+                        child: const MediaCpCover(),
                       ),
                     ),
                   ),
-                );
-              },
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'NÁŠ KRAJ. NAŠE HUDBA. VÁŠ DEN.',
+                        style: TextStyle(
+                          color: Color(0xFFB6C5D2),
+                          fontSize: 9,
+                          letterSpacing: 1.05,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      _Equalizer(
+                        animation: _equalizerController,
+                        isPlaying: viewModel.isPlaying,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 17),
+          const SizedBox(height: 15),
           Container(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(15, 13, 13, 13),
             decoration: BoxDecoration(
               color: const Color(0xFF101D2C),
-              borderRadius: BorderRadius.circular(19),
+              borderRadius: BorderRadius.circular(21),
               border: Border.all(color: const Color(0xFF26394A)),
             ),
             child: Row(
@@ -118,8 +156,8 @@ class _PlayerViewState extends State<PlayerView> {
                     track: viewModel.track,
                   ),
                 ),
-                const SizedBox(width: 10),
-                _ControlButton(
+                const SizedBox(width: 12),
+                _PlayButton(
                   isPlaying: viewModel.isPlaying,
                   play: viewModel.play,
                   pause: viewModel.pause,
@@ -127,12 +165,15 @@ class _PlayerViewState extends State<PlayerView> {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 13),
           Row(
             children: [
-              const Icon(Icons.volume_down_rounded,
-                size: 22, color: Color(0xFF95A7B8)),
-              const SizedBox(width: 9),
+              const Icon(
+                Icons.volume_down_rounded,
+                size: 22,
+                color: Color(0xFF95A7B8),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Slider(
                   value: viewModel.volume.clamp(0.0, 100.0).toDouble(),
@@ -143,20 +184,165 @@ class _PlayerViewState extends State<PlayerView> {
                   onChanged: viewModel.setVolume,
                 ),
               ),
-              const SizedBox(width: 9),
-              const Icon(Icons.volume_up_rounded,
-                size: 22, color: Color(0xFF95A7B8)),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.volume_up_rounded,
+                size: 22,
+                color: Color(0xFF95A7B8),
+              ),
             ],
           ),
-          const SizedBox(height: 29),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.timer_outlined,
+                  label: 'Časovač',
+                  onTap: () {
+                    Navigator.pushNamed(context, TimerView.routeName);
+                  },
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.auto_stories_outlined,
+                  label: 'Rájoviny',
+                  onTap: () => _openWebsite(Config.partnerWebsite),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.language_rounded,
+                  label: 'Web rádia',
+                  onTap: () => _openWebsite(Config.website),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
         ],
       ),
     );
   }
 }
 
+class _LivePill extends StatelessWidget {
+  const _LivePill({required this.isPlaying});
+
+  final bool isPlaying;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isPlaying
+        ? AppTheme.accentColor
+        : const Color(0xFF91A2B3);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.055),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: color.withOpacity(0.40)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: isPlaying
+                  ? [
+                      BoxShadow(
+                        color: color.withOpacity(0.45),
+                        blurRadius: 7,
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isPlaying ? 'PRÁVĚ VYSÍLÁME' : 'PŘIPRAVENO K POSLECHU',
+            style: TextStyle(
+              color: color,
+              fontSize: 9,
+              letterSpacing: 1.05,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Equalizer extends StatelessWidget {
+  const _Equalizer({
+    required this.animation,
+    required this.isPlaying,
+  });
+
+  final Animation<double> animation;
+  final bool isPlaying;
+
+  @override
+  Widget build(BuildContext context) {
+    const baseHeights = [7.0, 11.0, 8.0, 15.0, 10.0, 13.0, 8.0, 12.0];
+
+    return SizedBox(
+      height: 23,
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, child) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(baseHeights.length, (index) {
+              final wave = (math.sin(
+                        animation.value * 2 * math.pi + index * 0.82,
+                      ) +
+                      1) /
+                  2;
+              final barHeight = isPlaying
+                  ? 5.0 + wave * 17.0
+                  : baseHeights[index];
+
+              return Container(
+                width: 4,
+                height: barHeight,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  gradient: const LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Color(0xFF36C66A),
+                      Color(0xFFA6E81C),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _TrackInformation extends StatelessWidget {
-  const _TrackInformation({required this.artist, required this.track});
+  const _TrackInformation({
+    required this.artist,
+    required this.track,
+  });
+
   final String artist;
   final String track;
 
@@ -168,15 +354,16 @@ class _TrackInformation extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('PRÁVĚ HRAJE',
+          const Text(
+            'PRÁVĚ HRAJE',
             style: TextStyle(
               color: AppTheme.accentColor,
               fontSize: 10,
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w700,
+              letterSpacing: 1.25,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           SizedBox(
             height: 25,
             child: TextScroll(
@@ -214,32 +401,95 @@ class _TrackInformation extends StatelessWidget {
   }
 }
 
-class _ControlButton extends StatelessWidget {
-  const _ControlButton({
+class _PlayButton extends StatelessWidget {
+  const _PlayButton({
     required this.isPlaying,
     required this.play,
     required this.pause,
   });
+
   final bool isPlaying;
   final VoidCallback play;
   final VoidCallback pause;
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accentColor.withOpacity(0.24),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Material(
+        color: AppTheme.accentColor,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          splashColor: Colors.white24,
+          onTap: isPlaying ? pause : play,
+          child: SizedBox(
+            width: 70,
+            height: 70,
+            child: Icon(
+              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: const Color(0xFF101A27),
+              size: 40,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
-      color: AppTheme.accentColor,
-      shape: const CircleBorder(),
+      color: const Color(0xFF101D2C),
+      borderRadius: BorderRadius.circular(17),
       child: InkWell(
-        customBorder: const CircleBorder(),
-        splashColor: Colors.white24,
-        onTap: isPlaying ? pause : play,
-        child: SizedBox(
-          width: 68,
-          height: 68,
-          child: Icon(
-            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            color: const Color(0xFF101A27),
-            size: 39,
+        borderRadius: BorderRadius.circular(17),
+        onTap: onTap,
+        child: Container(
+          height: 78,
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: const Color(0xFF26394A)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: AppTheme.accentColor, size: 23),
+              const SizedBox(height: 7),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ),

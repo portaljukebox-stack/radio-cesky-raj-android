@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/build-original-small-apk.yml'
       - 'tools/prepare_original_flutter.py'
+      - 'tools/templates/**'
   workflow_dispatch:
 jobs:
   build:
