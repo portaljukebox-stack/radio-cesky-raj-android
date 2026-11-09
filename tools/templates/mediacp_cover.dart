@@ -134,7 +134,7 @@ class _MediaCpCoverState extends State<MediaCpCover>
               cover,
               key: ValueKey('mediacp:$cover'),
               width: double.infinity,
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               filterQuality: FilterQuality.high,
               gaplessPlayback: true,
               loadingBuilder: (context, child, progress) {
