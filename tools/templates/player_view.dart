@@ -185,7 +185,7 @@ class _PremiumTopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 13),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -208,7 +208,7 @@ class _PremiumTopBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: const Color(0xFF75C94A).withOpacity(0.55)),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               _PulseDot(),
@@ -297,7 +297,7 @@ class _PremiumArtwork extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.graphic_eq_rounded,
