@@ -419,21 +419,9 @@ new_metadata="""      metadata = value;
       artwork = null;
       notifyListeners();
       if (!Config.showAlbumCover || value.length < 2) return;
-      final artistName = value[0].trim().toLowerCase();
-      final trackName = value[1].trim().toLowerCase();
-      final fullName = '$artistName $trackName';
-      const nonMusic = [
-        'rádio český ráj', 'radio cesky raj', 'hřídelecká',
-        'kozákovská čarodějka', 'zprávy', 'jmeniny', 'počasí',
-        'dobrá rada', 'večer s příběhem', 'příběh', 'pohádka',
-        'víte, že', 'z českého ráje', 'sport českého ráje',
-        'rozhovor', 'pozvánka', 'regionální',
-      ];
-      if (artistName.isEmpty || trackName.isEmpty ||
-          artistName == trackName ||
-          nonMusic.any((phrase) => fullName.contains(phrase))) {
-        return;
-      }
+      // Keep all MediaCP metadata exactly as received. A long, unusual,
+      // or all-caps title can still be a real song title; never blacklist it.
+      if (value[0].trim().isEmpty || value[1].trim().isEmpty) return;
       try {
         final cover = await _radioPlayer.getArtworkImage();
         if (requestId != _artworkRequestId) return;
