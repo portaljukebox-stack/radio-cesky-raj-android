@@ -75,43 +75,106 @@ s = s.replace("static const privacyPolicy = 'Pravidla ochrany osobních údajů'
               "static const privacyPolicy = 'Zásady ochrany soukromí';")
 write("lib/language.dart", s)
 s = read("lib/widgets/sidebar.dart")
-partner_item = """      // Regionální mediální partner
-      _Item(
-        icon: Icons.article_outlined,
-        title: 'Rájoviny.cz – mediální partner',
-        onTap: () async {
-          Navigator.pop(context);
-          await launchUrl(Uri.parse(Config.partnerWebsite),
-              mode: LaunchMode.externalApplication);
-        },
-      ),
 
-"""
-if partner_item not in s:
-    sys.exit("STOP: Expected duplicate Rájoviny drawer item not found; no blind edit.")
-s = s.replace(partner_item, "", 1)
-# The original template's Rate Us entry is commented out, but remove even
-# that dormant block so no app-rating control can be re-enabled accidentally.
-rating_item = """      // // Rate Us
-      // _Item(
-      //   icon: Icons.star_outline,
-      //   title: Language.rateUs,
-      //   onTap: () {
-      //     Navigator.pop(context);
-      //     inAppReview.openStoreListing(appStoreId: Config.appStoreId);
-      //   },
-      // ),
+def remove_item_containing(source, marker):
+    """Remove one active Dart _Item(...) constructor containing marker."""
+    marker_pos = source.find(marker)
+    if marker_pos < 0:
+        return source, 0
+    start = source.rfind("_Item(", 0, marker_pos)
+    if start < 0:
+        return source, 0
+    line_start = source.rfind("\n", 0, start) + 1
+    if source[line_start:start].lstrip().startswith("//"):
+        return source, 0
 
-"""
-s = s.replace(rating_item, "", 1)
-s = s.replace("import 'package:in_app_review/in_app_review.dart';\n", "")
-s = s.replace("  final inAppReview = InAppReview.instance;\n", "")
-if "Config.partnerWebsite" in s or "Rájoviny.cz" in s or "Rájoviny" in s:
-    sys.exit("STOP: Duplicate Rájoviny drawer entry remains.")
-if "Language.rateUs" in s or "inAppReview" in s:
-    sys.exit("STOP: App-rating control remains in the drawer.")
+    depth = 0
+    quote = None
+    triple = False
+    line_comment = False
+    block_comment = False
+    i = start + len("_Item")
+    end = None
+    while i < len(source):
+        if line_comment:
+            if source[i] == "\n":
+                line_comment = False
+            i += 1
+            continue
+        if block_comment:
+            if source.startswith("*/", i):
+                block_comment = False
+                i += 2
+            else:
+                i += 1
+            continue
+        if quote is not None:
+            if source[i] == "\\":
+                i += 2
+                continue
+            if triple and source.startswith(quote * 3, i):
+                quote = None
+                triple = False
+                i += 3
+                continue
+            if not triple and source[i] == quote:
+                quote = None
+            i += 1
+            continue
+        if source.startswith("//", i):
+            line_comment = True
+            i += 2
+            continue
+        if source.startswith("/*", i):
+            block_comment = True
+            i += 2
+            continue
+        if source[i] in ("'", '"'):
+            quote = source[i]
+            triple = source.startswith(quote * 3, i)
+            i += 3 if triple else 1
+            continue
+        if source[i] == "(":
+            depth += 1
+        elif source[i] == ")":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+        i += 1
+
+    if end is None:
+        sys.exit("STOP: Could not safely parse the matching drawer item.")
+    if marker not in source[start:end]:
+        return source, 0
+
+    remove_start = line_start if not source[line_start:start].strip() else start
+    tail = end
+    while tail < len(source) and source[tail] in " \t":
+        tail += 1
+    if tail < len(source) and source[tail] == ",":
+        tail += 1
+    if tail < len(source) and source[tail] == "\r":
+        tail += 1
+    if tail < len(source) and source[tail] == "\n":
+        tail += 1
+    return source[:remove_start] + source[tail:], 1
+
+# Rájoviny belongs in the dedicated bottom navigation, not duplicated in
+# the drawer. Match the real constructor by its destination, not formatting.
+s, removed_partner = remove_item_containing(s, "Config.partnerWebsite")
+if not removed_partner:
+    s, removed_partner = remove_item_containing(s, "Rájoviny.cz")
+if not removed_partner:
+    print("DRAWER: no active Rájoviny _Item constructor found; leaving source unchanged.")
+
+# Never add an app-rating prompt. Remove an active rating row if the source
+# contains one; commented-out legacy examples are not treated as UI entries.
+s, removed_rating = remove_item_containing(s, "Language.rateUs")
+if not removed_rating:
+    s, removed_rating = remove_item_containing(s, "inAppReview.openStoreListing")
 write("lib/widgets/sidebar.dart", s)
-print("DRAWER VERIFIED: no Rájoviny duplicate and no app-rating control")
+print(f"DRAWER CLEANUP: partner_items={removed_partner}, rating_items={removed_rating}")
 
 
 # Change the sidebar's privacy entry from a modal dialog into a proper
