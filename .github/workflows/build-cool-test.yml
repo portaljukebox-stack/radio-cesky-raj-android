@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ PREMIUM 2.8 - isolated Android test
+name: RADIO CESKY RAJ PREMIUM 2.8.1 - permanent signing
 on:
   push:
     branches: [cool-visual-test]
@@ -33,14 +33,47 @@ jobs:
           echo "New Android Asset Packaging Tool: $AAPT2"
           echo "android.aapt2FromMavenOverride=$AAPT2" >> radio_cesky_raj/android/gradle.properties
 
+      - name: Restore permanent Android signing key
+        env:
+          ANDROID_SIGNING_BUNDLE: ${{ secrets.ANDROID_SIGNING_BUNDLE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_SIGNING_BUNDLE:-}" ]; then
+            echo "::error::Missing repository Actions secret ANDROID_SIGNING_BUNDLE. Add the permanent Android signing bundle before building."
+            exit 1
+          fi
           python3 - <<'PY'
+          import base64, json, os, subprocess
           from pathlib import Path
-          gradle=Path('radio_cesky_raj/android/app/build.gradle')
-          text=gradle.read_text()
-          old="if (keystorePropertiesFile.exists()) {\n                signingConfig signingConfigs.release\n            }"
-          assert old in text, "Unexpected signing configuration"
-          gradle.write_text(text.replace(old, "signingConfig signingConfigs.debug"))
+          bundle=json.loads(os.environ["ANDROID_SIGNING_BUNDLE"])
+          required=("keystore_base64","store_password","key_password","key_alias")
+          if any(not bundle.get(k) for k in required):
+              raise SystemExit("Signing bundle is incomplete; no APK will be built.")
+          app=Path("radio_cesky_raj/android/app")
+          root=Path("radio_cesky_raj/android")
+          app.mkdir(parents=True,exist_ok=True)
+          keystore=app/"upload-keystore.jks"
+          raw=base64.b64decode(bundle["keystore_base64"],validate=True)
+          if len(raw)<1000:
+              raise SystemExit("Signing keystore is unexpectedly small.")
+          keystore.write_bytes(raw)
+          keystore.chmod(0o600)
+          props=(
+              "storePassword="+bundle["store_password"]+"\\n"+
+              "keyPassword="+bundle["key_password"]+"\\n"+
+              "keyAlias="+bundle["key_alias"]+"\\n"+
+              "storeFile=upload-keystore.jks\\n"
+          )
+          (root/"key.properties").write_text(props,encoding="utf-8")
+          (root/"key.properties").chmod(0o600)
+          subprocess.run([
+              "keytool","-list","-keystore",str(keystore),
+              "-storepass",bundle["store_password"],"-alias",bundle["key_alias"]
+          ],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+          print("Permanent Android upload key restored and validated; secret values hidden.")
           PY
+          test -s radio_cesky_raj/android/key.properties
+          test -s radio_cesky_raj/android/app/upload-keystore.jks
       - name: Build smaller release APKs - identical original Flutter app
         working-directory: radio_cesky_raj
         run: |
@@ -60,17 +93,24 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p result
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_ARM64.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_ARM32.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_X86_64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_1_ARM64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_1_ARM32.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_1_X86_64.apk
           TOOL=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           for APK in result/*.apk; do
             echo "CHECK $APK"
             stat -c '%n %s bytes' "$APK"
             test "$(stat -c %s "$APK")" -gt 8000000
-            "$TOOL" verify --verbose "$APK"
-            "$AAPT" dump badging "$APK" | grep -E "^(package:|application-label:|native-code:)"
+            BADGING=$("$AAPT" dump badging "$APK")
+            echo "$BADGING" | grep -E "^(package:|application-label:|native-code:)"
+            echo "$BADGING" | grep -Fq "package: name='cz.radioceskyraj.radio'"
+            echo "$BADGING" | grep -Fq "versionCode='42' versionName='2.8.1'"
+            CERT=$("$TOOL" verify --verbose --print-certs "$APK" | awk -F': ' '/Signer #1 certificate SHA-256 digest:/ {print $NF; exit}')
+            test -n "$CERT"
+            if [ -z "${EXPECTED_CERT:-}" ]; then EXPECTED_CERT="$CERT"; else test "$CERT" = "$EXPECTED_CERT"; fi
+            EXPECTED_CERT="$CERT"
+            echo "Stable signing certificate: $CERT"
           done
           python3 - <<'PY'
           import zipfile
@@ -122,19 +162,19 @@ jobs:
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_8_ARM64
+          name: RCR_PREMIUM_2_8_1_ARM64
           path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM64.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_8_ARM32
+          name: RCR_PREMIUM_2_8_1_ARM32
           path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM32.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_8_X86_64
+          name: RCR_PREMIUM_2_8_1_X86_64
           path: result/Radio_Cesky_Raj_PREMIUM_2_8_X86_64.apk
           if-no-files-found: error
           retention-days: 30
