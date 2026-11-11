@@ -75,113 +75,45 @@ s = s.replace("static const privacyPolicy = 'Pravidla ochrany osobních údajů'
               "static const privacyPolicy = 'Zásady ochrany soukromí';")
 write("lib/language.dart", s)
 s = read("lib/widgets/sidebar.dart")
+partner_item = """      // Regionální mediální partner
+      _Item(
+        icon: Icons.article_outlined,
+        title: 'Rájoviny.cz – mediální partner',
+        onTap: () async {
+          Navigator.pop(context);
+          await launchUrl(Uri.parse(Config.partnerWebsite),
+              mode: LaunchMode.externalApplication);
+        },
+      ),
 
-def remove_sidebar_constructor_items(source, needles):
-    """Remove complete _Item(...) blocks matching one of the requested labels."""
-    ranges = []
-    cursor = 0
-    while True:
-        start = source.find("_Item(", cursor)
-        if start < 0:
-            break
-        open_paren = start + len("_Item")
-        depth = 0
-        quote = None
-        triple = False
-        line_comment = False
-        block_comment = False
-        i = open_paren
-        end = None
-        while i < len(source):
-            if line_comment:
-                if source[i] == "\n":
-                    line_comment = False
-                i += 1
-                continue
-            if block_comment:
-                if source.startswith("*/", i):
-                    block_comment = False
-                    i += 2
-                else:
-                    i += 1
-                continue
-            if quote is not None:
-                if source[i] == "\\":
-                    i += 2
-                    continue
-                if triple and source.startswith(quote * 3, i):
-                    quote = None
-                    triple = False
-                    i += 3
-                    continue
-                if not triple and source[i] == quote:
-                    quote = None
-                i += 1
-                continue
-            if source.startswith("//", i):
-                line_comment = True
-                i += 2
-                continue
-            if source.startswith("/*", i):
-                block_comment = True
-                i += 2
-                continue
-            if source[i] in ("'", '"'):
-                quote = source[i]
-                triple = source.startswith(quote * 3, i)
-                i += 3 if triple else 1
-                continue
-            if source[i] == "(":
-                depth += 1
-            elif source[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-            i += 1
-        if end is None:
-            sys.exit("STOP: Could not safely parse a sidebar _Item block.")
-        block = source[start:end].lower()
-        if any(term in block for term in needles):
-            line_start = source.rfind("\n", 0, start) + 1
-            if not source[line_start:start].strip():
-                start = line_start
-            tail = end
-            while tail < len(source) and source[tail] in " \t":
-                tail += 1
-            if tail < len(source) and source[tail] == ",":
-                tail += 1
-            if tail < len(source) and source[tail] == "\r":
-                tail += 1
-            if tail < len(source) and source[tail] == "\n":
-                tail += 1
-            ranges.append((start, tail))
-        cursor = end
-    for start, end in reversed(ranges):
-        source = source[:start] + source[end:]
-    return source, len(ranges)
+"""
+if partner_item not in s:
+    sys.exit("STOP: Expected duplicate Rájoviny drawer item not found; no blind edit.")
+s = s.replace(partner_item, "", 1)
+# The original template's Rate Us entry is commented out, but remove even
+# that dormant block so no app-rating control can be re-enabled accidentally.
+rating_item = """      // // Rate Us
+      // _Item(
+      //   icon: Icons.star_outline,
+      //   title: Language.rateUs,
+      //   onTap: () {
+      //     Navigator.pop(context);
+      //     inAppReview.openStoreListing(appStoreId: Config.appStoreId);
+      //   },
+      // ),
 
-s, removed_partner_items = remove_sidebar_constructor_items(
-    s, ["rajoviny.cz", "rájoviny", "config.partnerwebsite"]
-)
-s, removed_rating_items = remove_sidebar_constructor_items(
-    s, [
-        "hodnotit aplikaci", "ohodnotit aplikaci", "hodnocení aplikace",
-        "language.rateapp", "rateapp", "rate this app", "rate app",
-        "reviewapp", "app review",
-    ]
-)
+"""
+s = s.replace(rating_item, "", 1)
+s = s.replace("import 'package:in_app_review/in_app_review.dart';\n", "")
+s = s.replace("  final inAppReview = InAppReview.instance;\n", "")
 if "Config.partnerWebsite" in s or "Rájoviny.cz" in s or "Rájoviny" in s:
-    sys.exit("STOP: Rájoviny still appears in the secondary drawer menu.")
-if any(term in s.lower() for term in [
-    "hodnotit aplikaci", "ohodnotit aplikaci", "hodnocení aplikace",
-    "language.rateapp", "rateapp", "rate this app", "rate app",
-    "reviewapp", "app review",
-]):
-    sys.exit("STOP: App rating entry still appears in the drawer.")
-print("DRAWER CLEANED: removed Rájoviny items:", removed_partner_items,
-      "| removed app-rating items:", removed_rating_items)
+    sys.exit("STOP: Duplicate Rájoviny drawer entry remains.")
+if "Language.rateUs" in s or "inAppReview" in s:
+    sys.exit("STOP: App-rating control remains in the drawer.")
 write("lib/widgets/sidebar.dart", s)
+print("DRAWER VERIFIED: no Rájoviny duplicate and no app-rating control")
+
+
 # Change the sidebar's privacy entry from a modal dialog into a proper
 # screen. Preserve the original player route; the audio view model is shared.
 s = read("lib/widgets/sidebar.dart")
