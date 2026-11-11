@@ -1,9 +1,8 @@
-name: RADIO CESKY RAJ PREMIUM 2.8 - isolated Android test
+name: RADIO CESKY RAJ 2.8.1 - stable signed build
 on:
   push:
     branches: [cool-visual-test]
     paths:
-      - '.github/workflows/build-cool-test.yml'
       - 'tools/prepare_original_flutter.py'
       - 'tools/templates/**'
   workflow_dispatch:
@@ -32,15 +31,29 @@ jobs:
           test -x "$AAPT2"
           echo "New Android Asset Packaging Tool: $AAPT2"
           echo "android.aapt2FromMavenOverride=$AAPT2" >> radio_cesky_raj/android/gradle.properties
+      - name: Configure persistent release signing
+        env:
+          RCR_RELEASE_KEYSTORE_BASE64: ${{ secrets.RCR_RELEASE_KEYSTORE_BASE64 }}
+          RCR_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RCR_RELEASE_KEYSTORE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${RCR_RELEASE_KEYSTORE_BASE64:-}" || -z "${RCR_RELEASE_KEYSTORE_PASSWORD:-}" ]]; then
+            echo "Missing GitHub Actions secrets: RCR_RELEASE_KEYSTORE_BASE64 and/or RCR_RELEASE_KEYSTORE_PASSWORD"
+            exit 1
+          fi
+          printf '%s' "$RCR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/rcr-release.jks"
+          test -s "$RUNNER_TEMP/rcr-release.jks"
+          keytool -list -keystore "$RUNNER_TEMP/rcr-release.jks" -storepass "$RCR_RELEASE_KEYSTORE_PASSWORD" -alias rcr-release >/dev/null
+          cat > radio_cesky_raj/android/key.properties <<EOF
+          storePassword=$RCR_RELEASE_KEYSTORE_PASSWORD
+          keyPassword=$RCR_RELEASE_KEYSTORE_PASSWORD
+          keyAlias=rcr-release
+          storeFile=$RUNNER_TEMP/rcr-release.jks
+          EOF
+          chmod 600 radio_cesky_raj/android/key.properties "$RUNNER_TEMP/rcr-release.jks"
+          echo "Persistent Rádio Český ráj release signing key loaded."
 
-          python3 - <<'PY'
-          from pathlib import Path
-          gradle=Path('radio_cesky_raj/android/app/build.gradle')
-          text=gradle.read_text()
-          old="if (keystorePropertiesFile.exists()) {\n                signingConfig signingConfigs.release\n            }"
-          assert old in text, "Unexpected signing configuration"
-          gradle.write_text(text.replace(old, "signingConfig signingConfigs.debug"))
-          PY
       - name: Build smaller release APKs - identical original Flutter app
         working-directory: radio_cesky_raj
         run: |
@@ -60,9 +73,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p result
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_ARM64.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_ARM32.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_X86_64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_2_8_1_ARM64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_2_8_1_ARM32.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_2_8_1_X86_64.apk
           TOOL=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           for APK in result/*.apk; do
@@ -70,7 +83,9 @@ jobs:
             stat -c '%n %s bytes' "$APK"
             test "$(stat -c %s "$APK")" -gt 8000000
             "$TOOL" verify --verbose "$APK"
-            "$AAPT" dump badging "$APK" | grep -E "^(package:|application-label:|native-code:)"
+            BADGING=$("$AAPT" dump badging "$APK")
+            echo "$BADGING" | grep -E "^(package:|application-label:|native-code:)"
+            echo "$BADGING" | grep -F "package: name='cz.radioceskyraj.radio' versionCode='42' versionName='2.8.1'"
           done
           python3 - <<'PY'
           import zipfile
@@ -122,19 +137,19 @@ jobs:
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_8_ARM64
+          name: RCR_2_8_1_ARM64
           path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM64.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_8_ARM32
+          name: RCR_2_8_1_ARM32
           path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM32.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_8_X86_64
+          name: RCR_2_8_1_X86_64
           path: result/Radio_Cesky_Raj_PREMIUM_2_8_X86_64.apk
           if-no-files-found: error
           retention-days: 30
