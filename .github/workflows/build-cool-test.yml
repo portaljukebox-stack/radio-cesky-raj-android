@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ PREMIUM 2.7 - isolated Android test
+name: RADIO CESKY RAJ PREMIUM 2.8 - isolated Android test
 on:
   push:
     branches: [cool-visual-test]
@@ -60,9 +60,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p result
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_7_ARM64.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_7_ARM32.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_PREMIUM_2_7_X86_64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_ARM64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_ARM32.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_PREMIUM_2_8_X86_64.apk
           TOOL=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           for APK in result/*.apk; do
@@ -122,19 +122,19 @@ jobs:
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_7_ARM64
-          path: result/Radio_Cesky_Raj_PREMIUM_2_7_ARM64.apk
+          name: RCR_PREMIUM_2_8_ARM64
+          path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM64.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_7_ARM32
-          path: result/Radio_Cesky_Raj_PREMIUM_2_7_ARM32.apk
+          name: RCR_PREMIUM_2_8_ARM32
+          path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM32.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_PREMIUM_2_7_X86_64
-          path: result/Radio_Cesky_Raj_PREMIUM_2_7_X86_64.apk
+          name: RCR_PREMIUM_2_8_X86_64
+          path: result/Radio_Cesky_Raj_PREMIUM_2_8_X86_64.apk
           if-no-files-found: error
           retention-days: 30

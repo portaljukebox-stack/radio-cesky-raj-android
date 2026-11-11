@@ -75,22 +75,112 @@ s = s.replace("static const privacyPolicy = 'Pravidla ochrany osobních údajů'
               "static const privacyPolicy = 'Zásady ochrany soukromí';")
 write("lib/language.dart", s)
 s = read("lib/widgets/sidebar.dart")
-if "Config.partnerWebsite" not in s:
-    partner = """      // Regionální mediální partner
-      _Item(
-        icon: Icons.article_outlined,
-        title: 'Rájoviny.cz – mediální partner',
-        onTap: () async {
-          Navigator.pop(context);
-          await launchUrl(Uri.parse(Config.partnerWebsite),
-              mode: LaunchMode.externalApplication);
-        },
-      ),
 
-"""
-    if "      // Email" not in s:
-        sys.exit("Unexpected sidebar structure; will not discard original layout.")
-    s = s.replace("      // Email", partner + "      // Email", 1)
+def remove_sidebar_constructor_items(source, needles):
+    """Remove complete _Item(...) blocks matching one of the requested labels."""
+    ranges = []
+    cursor = 0
+    while True:
+        start = source.find("_Item(", cursor)
+        if start < 0:
+            break
+        open_paren = start + len("_Item")
+        depth = 0
+        quote = None
+        triple = False
+        line_comment = False
+        block_comment = False
+        i = open_paren
+        end = None
+        while i < len(source):
+            if line_comment:
+                if source[i] == "\n":
+                    line_comment = False
+                i += 1
+                continue
+            if block_comment:
+                if source.startswith("*/", i):
+                    block_comment = False
+                    i += 2
+                else:
+                    i += 1
+                continue
+            if quote is not None:
+                if source[i] == "\\":
+                    i += 2
+                    continue
+                if triple and source.startswith(quote * 3, i):
+                    quote = None
+                    triple = False
+                    i += 3
+                    continue
+                if not triple and source[i] == quote:
+                    quote = None
+                i += 1
+                continue
+            if source.startswith("//", i):
+                line_comment = True
+                i += 2
+                continue
+            if source.startswith("/*", i):
+                block_comment = True
+                i += 2
+                continue
+            if source[i] in ("'", '"'):
+                quote = source[i]
+                triple = source.startswith(quote * 3, i)
+                i += 3 if triple else 1
+                continue
+            if source[i] == "(":
+                depth += 1
+            elif source[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+            i += 1
+        if end is None:
+            sys.exit("STOP: Could not safely parse a sidebar _Item block.")
+        block = source[start:end].lower()
+        if any(term in block for term in needles):
+            line_start = source.rfind("\n", 0, start) + 1
+            if not source[line_start:start].strip():
+                start = line_start
+            tail = end
+            while tail < len(source) and source[tail] in " \t":
+                tail += 1
+            if tail < len(source) and source[tail] == ",":
+                tail += 1
+            if tail < len(source) and source[tail] == "\r":
+                tail += 1
+            if tail < len(source) and source[tail] == "\n":
+                tail += 1
+            ranges.append((start, tail))
+        cursor = end
+    for start, end in reversed(ranges):
+        source = source[:start] + source[end:]
+    return source, len(ranges)
+
+s, removed_partner_items = remove_sidebar_constructor_items(
+    s, ["rajoviny.cz", "rájoviny", "config.partnerwebsite"]
+)
+s, removed_rating_items = remove_sidebar_constructor_items(
+    s, [
+        "hodnotit aplikaci", "ohodnotit aplikaci", "hodnocení aplikace",
+        "language.rateapp", "rateapp", "rate this app", "rate app",
+        "reviewapp", "app review",
+    ]
+)
+if "Config.partnerWebsite" in s or "Rájoviny.cz" in s or "Rájoviny" in s:
+    sys.exit("STOP: Rájoviny still appears in the secondary drawer menu.")
+if any(term in s.lower() for term in [
+    "hodnotit aplikaci", "ohodnotit aplikaci", "hodnocení aplikace",
+    "language.rateapp", "rateapp", "rate this app", "rate app",
+    "reviewapp", "app review",
+]):
+    sys.exit("STOP: App rating entry still appears in the drawer.")
+print("DRAWER CLEANED: removed Rájoviny items:", removed_partner_items,
+      "| removed app-rating items:", removed_rating_items)
 write("lib/widgets/sidebar.dart", s)
 # Change the sidebar's privacy entry from a modal dialog into a proper
 # screen. Preserve the original player route; the audio view model is shared.
@@ -151,7 +241,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.7.0+40", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.8.0+41", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -452,7 +542,7 @@ assert "rcr_full_logo.png" in cover_source
 write("lib/screens/player/mediacp_cover.dart", cover_source)
 assert "MediaCpCover()" in read("lib/screens/player/player_view.dart")
 print("OFFICIAL MEDIACP COVER ART ENABLED with fallback, original radio playback untouched")
-print("REDESIGNED: centered main player and premium About page, original audio service preserved")
+print("REDESIGNED: large rotating vinyl with live song cover, clean navigation and premium About page")
 
 
 

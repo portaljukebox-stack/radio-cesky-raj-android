@@ -29,10 +29,15 @@ class _PlayerViewState extends State<PlayerView>
     vsync: this,
     duration: const Duration(milliseconds: 1050),
   );
+  late final AnimationController _recordRotation = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 22),
+  );
 
   @override
   void dispose() {
     _eq.dispose();
+    _recordRotation.dispose();
     super.dispose();
   }
 
@@ -45,10 +50,12 @@ class _PlayerViewState extends State<PlayerView>
 
   @override
   Widget build(BuildContext context) {
-    if (viewModel.isPlaying && !_eq.isAnimating) {
-      _eq.repeat();
-    } else if (!viewModel.isPlaying && _eq.isAnimating) {
-      _eq.stop();
+    if (viewModel.isPlaying) {
+      if (!_eq.isAnimating) _eq.repeat();
+      if (!_recordRotation.isAnimating) _recordRotation.repeat();
+    } else {
+      if (_eq.isAnimating) _eq.stop();
+      if (_recordRotation.isAnimating) _recordRotation.stop();
     }
 
     return BackButtonBehavior(
@@ -72,10 +79,10 @@ class _PlayerViewState extends State<PlayerView>
           child: SafeArea(
             child: LayoutBuilder(
               builder: (context, box) {
-                final compact = box.maxHeight < 690;
+                final compact = box.maxHeight < 720;
                 final artSize = math
-                    .min(box.maxWidth - 84, compact ? 158.0 : 222.0)
-                    .clamp(148.0, 232.0)
+                    .min(box.maxWidth - 52, compact ? 258.0 : 318.0)
+                    .clamp(220.0, 326.0)
                     .toDouble();
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -94,6 +101,7 @@ class _PlayerViewState extends State<PlayerView>
                             size: artSize,
                             isPlaying: viewModel.isPlaying,
                             animation: _eq,
+                            rotation: _recordRotation,
                           ),
                           SizedBox(height: compact ? 14 : 19),
                           _NowPlayingPanel(
@@ -108,13 +116,7 @@ class _PlayerViewState extends State<PlayerView>
                             volume: viewModel.volume,
                             onChanged: viewModel.setVolume,
                           ),
-                          SizedBox(height: compact ? 12 : 16),
-                          _QuickLinks(
-                            onPartner: () => _open(Config.partnerWebsite),
-                            onWebsite: () => _open(Config.website),
-                          ),
-                          SizedBox(height: compact ? 13 : 18),
-                          const _PremiumFooter(),
+                          SizedBox(height: compact ? 14 : 18),
                         ],
                       ),
                     ),
@@ -246,108 +248,177 @@ class _PremiumArtwork extends StatelessWidget {
     required this.size,
     required this.isPlaying,
     required this.animation,
+    required this.rotation,
   });
+
   final double size;
   final bool isPlaying;
   final Animation<double> animation;
+  final Animation<double> rotation;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(15, 14, 15, 13),
+      padding: const EdgeInsets.fromLTRB(12, 13, 12, 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1D4050), Color(0xFF142B3C), Color(0xFF0B1927)],
+          colors: [Color(0xFF18394A), Color(0xFF102638), Color(0xFF091522)],
         ),
         border: Border.all(
-          color: const Color(0xFF5C9872).withOpacity(0.45), width: 1.1,
+          color: const Color(0xFF5C9872).withOpacity(0.42),
+          width: 1.1,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6CCB68).withOpacity(0.10),
-            blurRadius: 34, spreadRadius: 1,
+            color: const Color(0xFF6CCB68).withOpacity(0.09),
+            blurRadius: 32,
+            spreadRadius: 1,
           ),
           const BoxShadow(
-            color: Color(0x44000000), blurRadius: 22, offset: Offset(0, 12),
+            color: Color(0x44000000),
+            blurRadius: 22,
+            offset: Offset(0, 12),
           ),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Positioned(
-            top: -size * 0.60,
-            right: -size * 0.46,
-            child: Container(
-              width: size * 1.5,
-              height: size * 1.5,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [
-                  const Color(0xFFA6E81C).withOpacity(0.18),
-                  const Color(0xFF00C5A4).withOpacity(0.05),
-                  Colors.transparent,
-                ]),
-              ),
-            ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.graphic_eq_rounded,
-                    color: Color(0xFFA6E81C), size: 17),
-                  SizedBox(width: 8),
-                  Text('ŽIVĚ Z ČESKÉHO RÁJE', style: TextStyle(
-                    color: Color(0xFFE2EDF1), fontSize: 10,
-                    letterSpacing: 1.55, fontWeight: FontWeight.w800,
-                  )),
-                ],
+              Icon(Icons.graphic_eq_rounded,
+                  color: Color(0xFFA6E81C), size: 18),
+              SizedBox(width: 9),
+              Text(
+                'ŽIVĚ Z ČESKÉHO RÁJE',
+                style: TextStyle(
+                  color: Color(0xFFE2EDF1),
+                  fontSize: 11,
+                  letterSpacing: 1.7,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              const SizedBox(height: 13),
-              Container(
+            ],
+          ),
+          const SizedBox(height: 13),
+          Center(
+            child: AnimatedBuilder(
+              animation: rotation,
+              child: Container(
                 width: size,
                 height: size,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF070D16),
-                  borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: Colors.white.withOpacity(0.16)),
+                  shape: BoxShape.circle,
+                  gradient: const RadialGradient(
+                    center: Alignment(-0.22, -0.25),
+                    radius: 0.95,
+                    colors: [
+                      Color(0xFF3A4650),
+                      Color(0xFF1B242E),
+                      Color(0xFF080D14),
+                    ],
+                    stops: [0.0, 0.48, 1.0],
+                  ),
+                  border: Border.all(
+                    color: const Color(0xFF53616B).withOpacity(0.72),
+                    width: 1.4,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.38),
-                      blurRadius: 25, offset: const Offset(0, 12),
+                      color: Colors.black.withOpacity(0.46),
+                      blurRadius: 25,
+                      offset: const Offset(0, 12),
                     ),
                     BoxShadow(
                       color: const Color(0xFFA6E81C).withOpacity(0.08),
-                      blurRadius: 20, spreadRadius: 1,
+                      blurRadius: 20,
+                      spreadRadius: 1,
                     ),
                   ],
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: const MediaCpCover(),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _VinylGroovesPainter(),
+                      ),
+                    ),
+                    Container(
+                      width: size * 0.57,
+                      height: size * 0.57,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF0A121B),
+                        border: Border.all(
+                          color: const Color(0xFFA6E81C),
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFA6E81C).withOpacity(0.20),
+                            blurRadius: 17,
+                            spreadRadius: 1,
+                          ),
+                          const BoxShadow(
+                            color: Color(0x99000000),
+                            blurRadius: 12,
+                            offset: Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: const MediaCpCover(),
+                      ),
+                    ),
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF05080D),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.72),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 13),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Flexible(
-                    child: Text('NÁŠ KRAJ. NAŠE HUDBA. VÁŠ DEN.',
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Color(0xFFD5E5EB), fontSize: 9,
-                        letterSpacing: 1.35, fontWeight: FontWeight.w800,
-                      )),
+              builder: (context, child) => Transform.rotate(
+                angle: rotation.value * math.pi * 2,
+                child: child,
+              ),
+            ),
+          ),
+          const SizedBox(height: 13),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Flexible(
+                child: Text(
+                  'NÁŠ KRAJ. NAŠE HUDBA. VÁŠ DEN.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFFD5E5EB),
+                    fontSize: 9,
+                    letterSpacing: 1.35,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(width: 12),
-                  _Equalizer(animation: animation, isPlaying: isPlaying, height: 19),
-                ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _Equalizer(
+                animation: animation,
+                isPlaying: isPlaying,
+                height: 20,
               ),
             ],
           ),
@@ -355,6 +426,31 @@ class _PremiumArtwork extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VinylGroovesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final outerRadius = size.width * 0.475;
+    for (var i = 0; i < 18; i++) {
+      final radius = outerRadius - i * size.width * 0.0092;
+      final opacity = 0.045 + (i % 4) * 0.018;
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = i % 3 == 0 ? 1.15 : 0.72
+        ..color = Colors.white.withOpacity(opacity);
+      canvas.drawCircle(center, radius, paint);
+    }
+    final rim = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = const Color(0xFFB7C7D0).withOpacity(0.19);
+    canvas.drawCircle(center, size.width * 0.493, rim);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _NowPlayingPanel extends StatelessWidget {
