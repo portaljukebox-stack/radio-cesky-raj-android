@@ -236,7 +236,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.8.0+41", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.8.1+42", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -246,7 +246,7 @@ s = read("android/app/build.gradle")
 s = re.sub(r"(?m)^apply plugin: 'com\.google\.gms\.google-services'\n", "", s)
 s = re.sub(r"(?m)^\s*implementation platform\('com\.google\.firebase:[^\n]+\n", "", s)
 s = re.sub(r"(?m)^\s*implementation 'com\.google\.firebase:[^\n]+\n", "", s)
-s = re.sub(r'applicationId\s+"[^"]+"', 'applicationId "cz.radioceskyraj.premium27"', s)
+s = re.sub(r'applicationId\s+"[^"]+"', 'applicationId "cz.radioceskyraj.radio"', s)
 # Don't accidentally use original keystore or null release signing data.
 s = re.sub(r"(?ms)^    signingConfigs \{.*?^    \}\n\n    buildTypes \{.*?^    \}",
 """    signingConfigs {
