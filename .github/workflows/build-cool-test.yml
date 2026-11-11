@@ -31,28 +31,15 @@ jobs:
           test -x "$AAPT2"
           echo "New Android Asset Packaging Tool: $AAPT2"
           echo "android.aapt2FromMavenOverride=$AAPT2" >> radio_cesky_raj/android/gradle.properties
-      - name: Configure persistent release signing
-        env:
-          RCR_RELEASE_KEYSTORE_BASE64: ${{ secrets.RCR_RELEASE_KEYSTORE_BASE64 }}
-          RCR_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RCR_RELEASE_KEYSTORE_PASSWORD }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${RCR_RELEASE_KEYSTORE_BASE64:-}" || -z "${RCR_RELEASE_KEYSTORE_PASSWORD:-}" ]]; then
-            echo "Missing GitHub Actions secrets: RCR_RELEASE_KEYSTORE_BASE64 and/or RCR_RELEASE_KEYSTORE_PASSWORD"
-            exit 1
-          fi
-          printf '%s' "$RCR_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/rcr-release.jks"
-          test -s "$RUNNER_TEMP/rcr-release.jks"
-          keytool -list -keystore "$RUNNER_TEMP/rcr-release.jks" -storepass "$RCR_RELEASE_KEYSTORE_PASSWORD" -alias rcr-release >/dev/null
-          cat > radio_cesky_raj/android/key.properties <<EOF
-          storePassword=$RCR_RELEASE_KEYSTORE_PASSWORD
-          keyPassword=$RCR_RELEASE_KEYSTORE_PASSWORD
-          keyAlias=rcr-release
-          storeFile=$RUNNER_TEMP/rcr-release.jks
-          EOF
-          chmod 600 radio_cesky_raj/android/key.properties "$RUNNER_TEMP/rcr-release.jks"
-          echo "Persistent Rádio Český ráj release signing key loaded."
+          python3 - <<'PY'
+          from pathlib import Path
+          gradle=Path('radio_cesky_raj/android/app/build.gradle')
+          text=gradle.read_text()
+          old="if (keystorePropertiesFile.exists()) {\\n                signingConfig signingConfigs.release\\n            }"
+          assert old in text, "Unexpected signing configuration"
+          gradle.write_text(text.replace(old, "signingConfig signingConfigs.debug"))
+          PY
+      - name: Build smaller release APKs - original Flutter application
 
       - name: Build smaller release APKs - identical original Flutter app
         working-directory: radio_cesky_raj
