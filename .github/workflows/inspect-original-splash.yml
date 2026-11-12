@@ -1,0 +1,28 @@
+name: Inspect original Android splash safely
+on:
+  push:
+    branches: [cool-visual-test]
+    paths: ['.github/workflows/inspect-original-splash.yml']
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print only startup and splash code
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          with zipfile.ZipFile('rohozec_radio (2).zip') as z:
+            for suffix in ('/lib/main.dart','/android/app/src/main/AndroidManifest.xml','/android/app/src/main/res/values/styles.xml','/android/app/src/main/res/values-v31/styles.xml','/android/app/src/main/res/drawable/launch_background.xml','/android/app/src/main/res/drawable-v21/launch_background.xml'):
+              files=[n for n in z.namelist() if n.endswith(suffix)]
+              print('===== '+suffix+' '+str(len(files))+' =====')
+              for name in files[:1]:
+                print(z.read(name).decode('utf-8')[:18000])
+            files=[n for n in z.namelist() if n.endswith('/pubspec.yaml')]
+            for name in files[:1]:
+              s=z.read(name).decode('utf-8')
+              print('===== PUBSPEC =====')
+              print(s[:7000])
+          PY
