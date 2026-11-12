@@ -162,6 +162,14 @@ jobs:
         with:
           name: RCR_TEST_2_8_1_X86_64
           path: apk
+      - name: Enable hardware acceleration for Android emulator
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod a+rw /dev/kvm
+            ls -l /dev/kvm
+          else
+            echo "::warning::KVM device unavailable on this runner"
+          fi
       - name: Test actual installation, startup and screenshot on Android 16
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -178,8 +186,8 @@ jobs:
             adb shell am start -n cz.radioceskyraj.radio/com.cheebeez.single_radio.MainActivity
             sleep 15
             mkdir -p screenshots
-            adb shell screencap -p /sdcard/rcr-android16.png
-            adb pull /sdcard/rcr-android16.png screenshots/RCR_2_8_1_ANDROID16.png
+            adb exec-out screencap -p > screenshots/RCR_2_8_1_ANDROID16.png
+            test -s screenshots/RCR_2_8_1_ANDROID16.png
             adb shell pidof cz.radioceskyraj.radio
             if adb logcat -d -s AndroidRuntime:E | grep -q 'FATAL EXCEPTION'; then
               echo 'AndroidRuntime fatal exception detected'
