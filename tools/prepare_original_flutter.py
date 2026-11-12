@@ -346,6 +346,94 @@ save_image("assets/images/splash.jpg", (1024,1024))
 save_image("assets/splash/splash.png", (1024,1024))
 save_image("assets/splash/splash12.png", (1024,1024))
 
+# Professional native launch screen: exact station artwork, no added package.
+# Flutter's first frame takes over from this Android-native splash automatically.
+from PIL import ImageDraw, ImageFont
+splash_res = out / "android/app/src/main/res"
+splash_logo = Image.open(ROOT / "assets/branding/rcr_full_logo.webp").convert("RGB")
+canvas = Image.new("RGB", (1080, 1920), (16, 26, 39))
+pixels = canvas.load()
+for y in range(1920):
+    t = y / 1919
+    for x in range(1080):
+        dx = (x - 540) / 540
+        glow = max(0, 1 - ((dx * dx + ((y - 700) / 1100) ** 2) ** 0.5))
+        pixels[x, y] = (
+            int(10 + 8 * glow),
+            int(19 + 17 * glow),
+            int(33 + 25 * glow),
+        )
+# Keep the entire supplied logo visible, with no crop or artificial replacement.
+logo_w = 760
+logo_h = round(logo_w * splash_logo.height / splash_logo.width)
+splash_logo = splash_logo.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
+# The original artwork has a black field; embed it on an intentional dark plaque.
+plaque = Image.new("RGB", (logo_w + 72, logo_h + 72), (4, 8, 15))
+canvas.paste(plaque, ((1080 - plaque.width)//2, 665 - 36))
+canvas.paste(splash_logo, ((1080 - logo_w)//2, 665))
+draw = ImageDraw.Draw(canvas)
+try:
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 37)
+except OSError:
+    font = ImageFont.load_default()
+tagline = "Náš kraj. Naše hudba. Váš den."
+draw.text((540, 1250), tagline, font=font, anchor="mm", fill=(216, 226, 234))
+draw.rounded_rectangle((456, 1355, 624, 1361), radius=3, fill=(166, 232, 28))
+nodpi = splash_res / "drawable-nodpi"
+nodpi.mkdir(parents=True, exist_ok=True)
+canvas.save(nodpi / "rcr_launch_art.png", optimize=True)
+# Android 12+ imposes a centered icon; give it generous safe padding.
+icon = Image.new("RGBA", (432, 432), (16, 26, 39, 255))
+safe_w = 276
+safe_h = round(safe_w * splash_logo.height / splash_logo.width)
+safe_logo = splash_logo.resize((safe_w, safe_h), Image.Resampling.LANCZOS)
+icon.paste(safe_logo, ((432-safe_w)//2, (432-safe_h)//2))
+icon.save(nodpi / "rcr_splash_icon.png", optimize=True)
+launch_xml = """<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/rcr_splash_background" />
+    <item>
+        <bitmap android:gravity="fill" android:src="@drawable/rcr_launch_art" />
+    </item>
+</layer-list>
+"""
+for folder in ("drawable", "drawable-v21"):
+    p = splash_res / folder / "launch_background.xml"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(launch_xml, encoding="utf-8")
+# Keep the original Android styles and modify only LaunchTheme.
+import xml.etree.ElementTree as ET
+ns = "http://schemas.android.com/apk/res/android"
+ET.register_namespace("android", ns)
+def update_launch_style(folder, android12=False):
+    p = splash_res / folder / "styles.xml"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if p.exists():
+        root = ET.parse(p).getroot()
+    else:
+        root = ET.Element("resources")
+    launch = next((e for e in root.findall("style") if e.get("name") == "LaunchTheme"), None)
+    if launch is None:
+        launch = ET.SubElement(root, "style", {"name": "LaunchTheme", "parent": "@android:style/Theme.Material.Light.NoActionBar"})
+    def item(name, value):
+        for old in list(launch.findall("item")):
+            if old.get("name") == name:
+                launch.remove(old)
+        ET.SubElement(launch, "item", {"name": name}).text = value
+    item("android:windowBackground", "@drawable/launch_background")
+    item("android:windowLightStatusBar", "false")
+    item("android:statusBarColor", "@color/rcr_splash_background")
+    item("android:navigationBarColor", "@color/rcr_splash_background")
+    if android12:
+        item("android:windowSplashScreenBackground", "@color/rcr_splash_background")
+        item("android:windowSplashScreenAnimatedIcon", "@drawable/rcr_splash_icon")
+        item("android:windowSplashScreenIconBackgroundColor", "@color/rcr_splash_background")
+    ET.ElementTree(root).write(p, encoding="utf-8", xml_declaration=True)
+update_launch_style("values")
+update_launch_style("values-v31", android12=True)
+# New color belongs to the existing colors.xml and must not be overwritten below.
+print("PRO SPLASH: exact logo, native pre-Android-12 artwork and Android-12+ launch icon installed")
+
 # Previous releases accidentally retained ORIGINAL brewery Android launcher icons
 # in res/mipmap-* and adaptive icon foregrounds. Replace every raster resource.
 # This is separate from Flutter's assets/appicon and MUST happen before compilation.
@@ -398,7 +486,7 @@ for fname in ("ic_launcher.xml","ic_launcher_round.xml"):
 colors=android_res/"values/colors.xml"
 colors.parent.mkdir(parents=True,exist_ok=True)
 colors.write_text("""<?xml version="1.0" encoding="utf-8"?>
-<resources><color name="ic_launcher_background">#101A27</color></resources>
+<resources><color name="ic_launcher_background">#101A27</color><color name="rcr_splash_background">#101A27</color></resources>
 """, encoding="utf-8")
 save_image("android/app/src/main/ic_launcher-playstore.png",(512,512))
 save_image("assets/images/rcr_logo.png",(1024,1024))
