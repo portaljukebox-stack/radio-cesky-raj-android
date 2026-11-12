@@ -1,8 +1,9 @@
-name: RADIO CESKY RAJ 2.8.1 - stable signed build
+name: RADIO CESKY RAJ 2.8.1 TEST - temporary signing
 on:
   push:
     branches: [cool-visual-test]
     paths:
+      - '.github/workflows/build-cool-test.yml'
       - 'tools/prepare_original_flutter.py'
       - 'tools/templates/**'
   workflow_dispatch:
@@ -33,14 +34,18 @@ jobs:
           echo "android.aapt2FromMavenOverride=$AAPT2" >> radio_cesky_raj/android/gradle.properties
           python3 - <<'PY'
           from pathlib import Path
+          import re
           gradle=Path('radio_cesky_raj/android/app/build.gradle')
-          text=gradle.read_text()
-          old="if (keystorePropertiesFile.exists()) {\\n                signingConfig signingConfigs.release\\n            }"
-          assert old in text, "Unexpected signing configuration"
-          gradle.write_text(text.replace(old, "signingConfig signingConfigs.debug"))
+          source=gradle.read_text(encoding='utf-8')
+          source,n=re.subn(
+              r'if \(keystorePropertiesFile\.exists\(\)\) \{\s*signingConfig signingConfigs\.release\s*\}',
+              'signingConfig signingConfigs.debug', source
+          )
+          if n != 1:
+              raise SystemExit('STOP: Release signing configuration has changed')
+          gradle.write_text(source,encoding='utf-8')
+          print('TEST ONLY: release APK uses temporary Android debug signing, NOT the final release key')
           PY
-      - name: Build smaller release APKs - original Flutter application
-
       - name: Build smaller release APKs - identical original Flutter app
         working-directory: radio_cesky_raj
         run: |
@@ -72,7 +77,10 @@ jobs:
             "$TOOL" verify --verbose "$APK"
             BADGING=$("$AAPT" dump badging "$APK")
             echo "$BADGING" | grep -E "^(package:|application-label:|native-code:)"
-            echo "$BADGING" | grep -F "package: name='cz.radioceskyraj.radio' versionCode='42' versionName='2.8.1'"
+            echo "$BADGING" | grep -F "package: name='cz.radioceskyraj.radio'"
+            echo "$BADGING" | grep -F "versionName='2.8.1'"
+            echo "$BADGING" | grep -E "versionCode='(1042|2042|4042)'"
+            echo "$BADGING" | grep -F "targetSdkVersion:'35'"
           done
           python3 - <<'PY'
           import zipfile
@@ -124,19 +132,65 @@ jobs:
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_2_8_1_ARM64
-          path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM64.apk
+          name: RCR_TEST_2_8_1_ARM64
+          path: result/Radio_Cesky_Raj_2_8_1_ARM64.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_2_8_1_ARM32
-          path: result/Radio_Cesky_Raj_PREMIUM_2_8_ARM32.apk
+          name: RCR_TEST_2_8_1_ARM32
+          path: result/Radio_Cesky_Raj_2_8_1_ARM32.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_2_8_1_X86_64
-          path: result/Radio_Cesky_Raj_PREMIUM_2_8_X86_64.apk
+          name: RCR_TEST_2_8_1_X86_64
+          path: result/Radio_Cesky_Raj_2_8_1_X86_64.apk
           if-no-files-found: error
           retention-days: 30
+
+  android16:
+    name: Install and launch on Android 16
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RCR_TEST_2_8_1_X86_64
+          path: apk
+      - name: Test actual installation, startup and screenshot on Android 16
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            test -s apk/Radio_Cesky_Raj_2_8_1_X86_64.apk
+            adb install -r apk/Radio_Cesky_Raj_2_8_1_X86_64.apk
+            adb logcat -c
+            adb shell am start -n cz.radioceskyraj.radio/com.cheebeez.single_radio.MainActivity
+            sleep 15
+            mkdir -p screenshots
+            adb shell screencap -p /sdcard/rcr-android16.png
+            adb pull /sdcard/rcr-android16.png screenshots/RCR_2_8_1_ANDROID16.png
+            adb shell pidof cz.radioceskyraj.radio
+            if adb logcat -d -s AndroidRuntime:E | grep -q 'FATAL EXCEPTION'; then
+              echo 'AndroidRuntime fatal exception detected'
+              adb logcat -d -s AndroidRuntime:E | tail -100
+              exit 1
+            fi
+            echo 'ANDROID 16: INSTALLATION AND STARTUP OK'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RCR_TEST_2_8_1_ANDROID16_SCREENSHOT
+          path: screenshots/
+          if-no-files-found: ignore
+          retention-days: 14
