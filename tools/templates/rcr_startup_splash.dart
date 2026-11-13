@@ -26,7 +26,7 @@ class _RcrStartupSplashState extends State<RcrStartupSplash>
       duration: const Duration(milliseconds: 420),
       value: 1,
     );
-    _hold = Timer(const Duration(milliseconds: 1550), () async {
+    _hold = Timer(const Duration(milliseconds: 3200), () async {
       if (!mounted) return;
       await _fade.reverse();
       if (mounted) setState(() => _visible = false);
