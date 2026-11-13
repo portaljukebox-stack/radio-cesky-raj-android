@@ -57,7 +57,7 @@ class _RcrStartupSplashState extends State<RcrStartupSplash>
                     builder: (context, constraints) {
                       return Image.asset(
                         'assets/images/rcr_premium_splash.webp',
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                         alignment: Alignment.center,
                         filterQuality: FilterQuality.high,
                         gaplessPlayback: true,
