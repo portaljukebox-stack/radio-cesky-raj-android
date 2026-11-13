@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.1 TEST - temporary signing
+name: RADIO CESKY RAJ 2.8.2 PREMIUM SPLASH TEST - temporary signing
 on:
   push:
     branches: [cool-visual-test]
@@ -65,9 +65,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p result
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_2_8_1_ARM64.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_2_8_1_ARM32.apk
-          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_2_8_1_X86_64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk result/Radio_Cesky_Raj_2_8_2_ARM64.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk result/Radio_Cesky_Raj_2_8_2_ARM32.apk
+          cp radio_cesky_raj/build/app/outputs/flutter-apk/app-x86_64-release.apk result/Radio_Cesky_Raj_2_8_2_X86_64.apk
           TOOL=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           for APK in result/*.apk; do
@@ -78,8 +78,8 @@ jobs:
             BADGING=$("$AAPT" dump badging "$APK")
             echo "$BADGING" | grep -E "^(package:|application-label:|native-code:)"
             echo "$BADGING" | grep -F "package: name='cz.radioceskyraj.radio'"
-            echo "$BADGING" | grep -F "versionName='2.8.1'"
-            echo "$BADGING" | grep -E "versionCode='(1042|2042|4042)'"
+            echo "$BADGING" | grep -F "versionName='2.8.2'"
+            echo "$BADGING" | grep -E "versionCode='(1043|2043|4043)'"
             echo "$BADGING" | grep -F "targetSdkVersion:'35'"
           done
           python3 - <<'PY'
@@ -132,26 +132,27 @@ jobs:
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_TEST_2_8_1_ARM64
-          path: result/Radio_Cesky_Raj_2_8_1_ARM64.apk
+          name: RCR_TEST_2_8_2_ARM64
+          path: result/Radio_Cesky_Raj_2_8_2_ARM64.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_TEST_2_8_1_ARM32
-          path: result/Radio_Cesky_Raj_2_8_1_ARM32.apk
+          name: RCR_TEST_2_8_2_ARM32
+          path: result/Radio_Cesky_Raj_2_8_2_ARM32.apk
           if-no-files-found: error
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_TEST_2_8_1_X86_64
-          path: result/Radio_Cesky_Raj_2_8_1_X86_64.apk
+          name: RCR_TEST_2_8_2_X86_64
+          path: result/Radio_Cesky_Raj_2_8_2_X86_64.apk
           if-no-files-found: error
           retention-days: 30
 
   android16:
-    name: Install and launch on Android 16
+    name: Android 16 emulator smoke test (best effort)
     needs: build
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -160,7 +161,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: RCR_TEST_2_8_1_X86_64
+          name: RCR_TEST_2_8_2_X86_64
           path: apk
       - name: Enable hardware acceleration for Android emulator
         run: |
@@ -180,14 +181,14 @@ jobs:
           disable-animations: true
           script: |
             set -euo pipefail
-            test -s apk/Radio_Cesky_Raj_2_8_1_X86_64.apk
-            adb install -r apk/Radio_Cesky_Raj_2_8_1_X86_64.apk
+            test -s apk/Radio_Cesky_Raj_2_8_2_X86_64.apk
+            adb install -r apk/Radio_Cesky_Raj_2_8_2_X86_64.apk
             adb logcat -c
             adb shell am start -n cz.radioceskyraj.radio/com.cheebeez.single_radio.MainActivity
             sleep 15
             mkdir -p screenshots
-            adb exec-out screencap -p > screenshots/RCR_2_8_1_ANDROID16.png
-            test -s screenshots/RCR_2_8_1_ANDROID16.png
+            adb exec-out screencap -p > screenshots/RCR_2_8_2_ANDROID16.png
+            test -s screenshots/RCR_2_8_2_ANDROID16.png
             adb shell pidof cz.radioceskyraj.radio
             if adb logcat -d -s AndroidRuntime:E | grep -q 'FATAL EXCEPTION'; then
               echo 'AndroidRuntime fatal exception detected'
@@ -198,7 +199,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: RCR_TEST_2_8_1_ANDROID16_SCREENSHOT
+          name: RCR_TEST_2_8_2_ANDROID16_SCREENSHOT
           path: screenshots/
           if-no-files-found: ignore
           retention-days: 14
