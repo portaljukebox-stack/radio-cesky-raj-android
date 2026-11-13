@@ -261,7 +261,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.8.2+43", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.8.3+44", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
