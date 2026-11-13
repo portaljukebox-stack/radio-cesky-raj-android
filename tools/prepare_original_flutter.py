@@ -218,6 +218,31 @@ if not privacy_template.is_file():
 write("lib/screens/privacy/privacy_view.dart", privacy_template.read_text(encoding="utf-8"))
 print("NATIVE PRIVACY SCREEN REGISTERED as /privacy; no MarkdownDialog overlay")
 
+# Premium startup screen: display the user-approved full portrait artwork in
+# Flutter immediately after Android's mandatory system splash. This is required
+# on Android 12+, which only permits a centered icon during the native phase.
+premium_asset = ROOT / "assets/branding/rcr_premium_splash.webp"
+if not premium_asset.is_file() or premium_asset.stat().st_size < 6000:
+    sys.exit("STOP: approved premium splash image is not present in repository")
+shutil.copy2(premium_asset, out / "assets/images/rcr_premium_splash.webp")
+main_file = read("lib/main.dart")
+import_anchor = "import 'package:single_radio/config.dart';"
+if main_file.count(import_anchor) != 1:
+    sys.exit("STOP: original Flutter main.dart import changed")
+main_file = main_file.replace(import_anchor, import_anchor + "\nimport 'package:single_radio/screens/startup/rcr_startup_splash.dart';")
+builder_anchor = "        theme: AppTheme.themeData,"
+if main_file.count(builder_anchor) != 1:
+    sys.exit("STOP: original Flutter app builder changed")
+main_file = main_file.replace(builder_anchor,
+    builder_anchor + "\n        builder: (context, child) => RcrStartupSplash(child: child ?? const SizedBox.shrink()),")
+write("lib/main.dart", main_file)
+splash_dart = ROOT / "tools/templates/rcr_startup_splash.dart"
+if not splash_dart.is_file():
+    sys.exit("STOP: premium Flutter startup overlay template missing")
+write("lib/screens/startup/rcr_startup_splash.dart", splash_dart.read_text(encoding="utf-8"))
+print("PREMIUM SPLASH: full-screen approved portrait artwork will appear after native Android launch")
+
+
 s = read("lib/theme.dart")
 colors = {
     "0xFF141C27":"0xFF101A27",
@@ -236,7 +261,7 @@ for line in ["  firebase_core: ^2.13.1\n",
              "  firebase_messaging: ^14.6.2\n",
              "  flutter_local_notifications: 13.0.0\n"]:
     s = s.replace(line, "")
-s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.8.1+42", s)
+s = re.sub(r"(?m)^version:\s*[^\n]+", "version: 2.8.2+43", s)
 s = s.replace('#FFFFFFFF', '#101A27').replace('#323d23', '#142131')
 write("pubspec.yaml", s)
 s = read("android/build.gradle")
@@ -284,7 +309,7 @@ write("android/gradle.properties",gradle_props)
 s = read("android/app/src/main/AndroidManifest.xml")
 s = s.replace('android:label="Radio Rohozec"', 'android:label="Rádio Český ráj"')
 s = s.replace('android:label="Rádio Rohozec"', 'android:label="Rádio Český ráj"')
-s = s.replace('android:label="Rádio Český ráj"', 'android:label="Rádio ČR PREMIUM 2.7"')
+# Preserve full station name on the launcher.
 if 'android.permission.INTERNET' not in s:
     s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET" />\n    <application', 1)
 s = re.sub(r'(?ms)        <meta-data\s+android:name="com\.google\.firebase\..*?/>', '', s)
