@@ -406,7 +406,16 @@ draw.text((540, 1250), tagline, font=font, anchor="mm", fill=(216, 226, 234))
 draw.rounded_rectangle((456, 1355, 624, 1361), radius=3, fill=(166, 232, 28))
 nodpi = splash_res / "drawable-nodpi"
 nodpi.mkdir(parents=True, exist_ok=True)
-canvas.save(nodpi / "rcr_launch_art.png", optimize=True)
+# Match the approved portrait artwork in Android's pre-Flutter launch frame.
+from PIL import ImageOps
+native_splash = ImageOps.pad(
+    Image.open(premium_asset).convert("RGB"),
+    (1080, 1920),
+    method=Image.Resampling.LANCZOS,
+    color=(6, 19, 41),
+    centering=(0.5, 0.5),
+)
+native_splash.save(nodpi / "rcr_launch_art.png", optimize=True)
 # Android 12+ imposes a centered icon; give it generous safe padding.
 icon = Image.new("RGBA", (432, 432), (16, 26, 39, 255))
 safe_w = 276
