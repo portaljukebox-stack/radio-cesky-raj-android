@@ -1,0 +1,107 @@
+name: RADIO CESKY RAJ 2.8.3 - iOS Simulator (no Apple account)
+on:
+  push:
+    branches: [cool-visual-test]
+    paths:
+      - '.github/workflows/build-ios-simulator.yml'
+      - 'tools/prepare_original_flutter.py'
+      - 'tools/prepare_ios_project.py'
+      - 'tools/templates/**'
+      - 'assets/branding/rcr_premium_splash.webp'
+      - 'app/src/main/assets/icon.webp'
+      - 'rohozec_radio (2).zip'
+  workflow_dispatch:
+jobs:
+  ios-simulator:
+    name: Build and launch Rádio Český ráj on iPhone Simulator
+    runs-on: macos-14
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select available Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Available Xcode installations:"
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+          xcodebuild -version
+          xcode-select -p
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.7.12'
+          channel: stable
+          cache: true
+
+      - name: Prepare original Flutter app and iOS project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user Pillow==12.0.0
+          python3 tools/verify_logo.py
+          python3 tools/prepare_original_flutter.py
+          cd radio_cesky_raj
+          flutter create --platforms=ios --org cz.radioceskyraj .
+          cd ..
+          python3 tools/prepare_ios_project.py
+
+      - name: Resolve Flutter and CocoaPods dependencies
+        working-directory: radio_cesky_raj
+        run: |
+          set -euo pipefail
+          flutter doctor -v
+          flutter pub get
+          cd ios
+          pod install
+          cd ..
+
+      - name: Build unsigned iOS Simulator application
+        working-directory: radio_cesky_raj
+        run: |
+          set -euo pipefail
+          flutter build ios --simulator --no-codesign --release
+          test -d build/ios/iphonesimulator/Runner.app
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ios/iphonesimulator/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' build/ios/iphonesimulator/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' build/ios/iphonesimulator/Runner.app/Info.plist
+
+      - name: Install and launch on an available iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p result
+          DEVICE_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); a=[x for v in d["devices"].values() for x in v if x["isAvailable"] and x["name"].startswith("iPhone")]; print(a[0]["udid"] if a else "")')"
+          if [ -z "$DEVICE_ID" ]; then
+            echo "No available iPhone simulator was found"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Using simulator $DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          xcrun simctl install "$DEVICE_ID" radio_cesky_raj/build/ios/iphonesimulator/Runner.app
+          xcrun simctl launch "$DEVICE_ID" cz.radioceskyraj.radio
+          sleep 8
+          xcrun simctl io "$DEVICE_ID" screenshot result/RCR_iOS_2_8_3_SIMULATOR.png
+          test -s result/RCR_iOS_2_8_3_SIMULATOR.png
+          echo "iOS SIMULATOR: app installed and launched"
+
+      - name: Package unsigned simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          ditto -c -k --sequesterRsrc --keepParent radio_cesky_raj/build/ios/iphonesimulator/Runner.app result/RCR_iOS_2_8_3_SIMULATOR_UNSIGNED.zip
+          shasum -a 256 result/*
+          ls -lh result/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCR_iOS_2_8_3_SIMULATOR_UNSIGNED
+          path: |
+            result/RCR_iOS_2_8_3_SIMULATOR_UNSIGNED.zip
+            result/RCR_iOS_2_8_3_SIMULATOR.png
+          if-no-files-found: error
+          retention-days: 30
