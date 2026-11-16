@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -84,6 +86,10 @@ class _PlayerViewState extends State<PlayerView>
                   isPlaying: viewModel.isPlaying,
                   animation: _equalizerController,
                 ),
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: _ListenerCountBadge(),
+                ),
                 Center(
                   child: _ArtworkCard(size: artworkSize),
                 ),
@@ -110,6 +116,190 @@ class _PlayerViewState extends State<PlayerView>
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ListenerProfile {
+  const _ListenerProfile({
+    required this.minimum,
+    required this.maximum,
+    required this.target,
+  });
+
+  final int minimum;
+  final int maximum;
+  final double target;
+}
+
+class _ListenerCountBadge extends StatefulWidget {
+  const _ListenerCountBadge();
+
+  @override
+  State<_ListenerCountBadge> createState() => _ListenerCountBadgeState();
+}
+
+class _ListenerCountBadgeState extends State<_ListenerCountBadge>
+    with WidgetsBindingObserver {
+  final math.Random _random = math.Random();
+  late int _listeners;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _listeners = _initialCount(DateTime.now());
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _refreshCount(),
+    );
+  }
+
+  int _initialCount(DateTime now) {
+    final profile = _profileAt(now);
+    final spread = math.min(35, (profile.maximum - profile.minimum) ~/ 20);
+    final offset = _random.nextInt(spread * 2 + 1) - spread;
+    return (profile.target.round() + offset)
+        .clamp(profile.minimum, profile.maximum)
+        .toInt();
+  }
+
+  void _refreshCount() {
+    if (!mounted) return;
+
+    final profile = _profileAt(DateTime.now());
+    final distanceToTrend = profile.target - _listeners;
+
+    // The long-term daily curve gently guides the number up or down.
+    // Small independent movements keep it alive between those trends.
+    var trendStep = 0;
+    if (distanceToTrend.abs() > 12) {
+      final amount = 1 + _random.nextInt(4);
+      trendStep = distanceToTrend > 0 ? amount : -amount;
+    }
+
+    final naturalMovement = _random.nextInt(9) - 4;
+    var change = trendStep + naturalMovement;
+    if (change == 0) {
+      change = _random.nextBool() ? 1 : -1;
+    }
+
+    var next = (_listeners + change)
+        .clamp(profile.minimum, profile.maximum)
+        .toInt();
+
+    // Always show a small movement, even when the value reaches a boundary.
+    if (next == _listeners) {
+      next = _listeners >= profile.maximum
+          ? _listeners - 1
+          : _listeners + 1;
+    }
+
+    setState(() => _listeners = next);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshCount();
+  }
+
+  static _ListenerProfile _profileAt(DateTime now) {
+    final minute = now.hour * 60 + now.minute;
+
+    if (minute < 360) {
+      return const _ListenerProfile(
+        minimum: 200,
+        maximum: 500,
+        target: 350,
+      );
+    }
+
+    if (minute < 540) {
+      final progress = (minute - 360) / 180.0;
+      return _ListenerProfile(
+        minimum: 1800,
+        maximum: 3600,
+        target: 1800 + 1800 * progress,
+      );
+    }
+
+    if (minute < 960) {
+      final progress = (minute - 540) / 420.0;
+      return _ListenerProfile(
+        minimum: 3600,
+        maximum: 9580,
+        target: 3600 + 5980 * math.sin(math.pi * progress),
+      );
+    }
+
+    final progress = (minute - 960) / 479.0;
+    return _ListenerProfile(
+      minimum: 500,
+      maximum: 3500,
+      target: 3500 - 3000 * progress,
+    );
+  }
+
+  String _formatCount(int value) {
+    final digits = value.toString();
+    final output = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) output.write(' ');
+      output.write(digits[i]);
+    }
+    return output.toString();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14332D),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: const Color(0xFF75C94A).withOpacity(0.42),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.headphones_rounded,
+            size: 15,
+            color: Color(0xFFA6E81C),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            _formatCount(_listeners),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              height: 1,
+              fontWeight: FontWeight.w900,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'POSLUCHAČŮ PRÁVĚ TEĎ',
+            style: TextStyle(
+              color: Color(0xFFB8F16B),
+              fontSize: 8,
+              letterSpacing: 0.55,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
