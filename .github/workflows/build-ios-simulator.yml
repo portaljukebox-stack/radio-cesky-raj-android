@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, Python syntax fix and Firebase cleanup)
+name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, Xcode project line endings and signing cleanup)
 on:
   push:
     branches: [cool-visual-test]
