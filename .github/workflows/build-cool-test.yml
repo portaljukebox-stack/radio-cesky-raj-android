@@ -52,6 +52,26 @@ jobs:
           flutter pub get
           python3 - <<'PY'
           from pathlib import Path
+          root=Path.home()/'.pub-cache/hosted/pub.dev/radio_player-1.2.1/android/src/main'
+          print('=== PINNED RADIO_PLAYER 1.2.1 ANDROID SOURCE DIAGNOSTIC ===')
+          if not root.is_dir():
+              raise SystemExit('STOP: radio_player 1.2.1 Android source not found in pub cache')
+          for source in sorted(root.rglob('*.kt')) + sorted(root.rglob('*.java')):
+              lines=source.read_text(encoding='utf-8',errors='replace').splitlines()
+              hits=[i for i,line in enumerate(lines) if any(k in line for k in
+                    ('killProcess','myPid','onDestroy','stopSelf','releasePlayer','Process.'))]
+              if hits:
+                  print('\\n---',source.relative_to(root),'---')
+                  shown=set()
+                  for i in hits:
+                      for n in range(max(0,i-5),min(len(lines),i+9)):
+                          if n not in shown:
+                              print(f'{n+1}: {lines[n]}')
+                              shown.add(n)
+          print('=== END RADIO_PLAYER DIAGNOSTIC ===')
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
           cache=Path.home()/'.pub-cache/hosted/pub.dev/radio_player-1.2.1/android/build.gradle'
           gradle=cache.read_text()
           assert gradle.count('com.google.android.exoplayer:') == 2, "Radio player dependency layout changed"
@@ -188,18 +208,30 @@ jobs:
             adb logcat -c
             mkdir -p screenshots
             adb shell am start -W -n cz.radioceskyraj.radio/com.cheebeez.single_radio.MainActivity
-            sleep 12
-            adb shell pidof cz.radioceskyraj.radio > screenshots/app_pid.txt
-            test -s screenshots/app_pid.txt
+            sleep 10
+            adb shell pidof cz.radioceskyraj.radio > screenshots/app_pid.txt || true
+            adb shell ps -A > screenshots/processes.txt
             adb shell dumpsys activity activities > screenshots/activities.txt
             adb shell dumpsys window windows > screenshots/windows.txt
-            adb logcat -d -s AndroidRuntime:E > screenshots/android_runtime_errors.txt
+            adb logcat -d -v threadtime > screenshots/logcat.txt
             adb exec-out screencap -p > screenshots/RCR_2_8_3_ANDROID16.png
-            test -s screenshots/RCR_2_8_3_ANDROID16.png
-            adb shell dumpsys meminfo cz.radioceskyraj.radio > screenshots/app_meminfo.txt
-            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep -F 'cz.radioceskyraj.radio'
-            ! grep -q 'FATAL EXCEPTION' screenshots/android_runtime_errors.txt
-            echo 'ANDROID 16: INSTALLATION, LIVE FOREGROUND PROCESS AND NO FATAL EXCEPTION OK'
+            adb shell dumpsys meminfo cz.radioceskyraj.radio > screenshots/app_meminfo.txt || true
+            echo '=== APP PROCESS ==='
+            cat screenshots/app_pid.txt
+            grep -E 'cz.radioceskyraj.radio|radio_player' screenshots/processes.txt || true
+            echo '=== APP ACTIVITY ==='
+            grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|cz.radioceskyraj.radio' screenshots/activities.txt | tail -30 || true
+            echo '=== APP EXIT / CRASH DIAGNOSTICS ==='
+            grep -Ei 'FATAL EXCEPTION|Process .* has died|Force finishing|Fatal signal|SIGKILL|SIG 9|killProcess|ExoPlayerImpl: Release|radio_player|AndroidRuntime' screenshots/logcat.txt | tail -100 || true
+            if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' screenshots/activities.txt | grep -q 'cz.radioceskyraj.radio'; then
+              echo 'FAIL: Rádio Český ráj activity is no longer in foreground after startup'
+              exit 1
+            fi
+            if grep -q 'FATAL EXCEPTION' screenshots/logcat.txt; then
+              echo 'FAIL: Android runtime fatal exception detected'
+              exit 1
+            fi
+            echo 'ANDROID 16: APP ACTIVITY REMAINS IN FOREGROUND'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
