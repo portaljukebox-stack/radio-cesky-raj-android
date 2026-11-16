@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (stream online/offline status)
+name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (stream online/offline status test)
 on:
   push:
     branches: [cool-visual-test]
