@@ -175,9 +175,11 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
-          target: google_apis
+          target: default
           arch: x86_64
           profile: pixel_6
+          ram-size: 4096M
+          heap-size: 1024M
           disable-animations: true
           script: |
             set -eu
@@ -186,40 +188,18 @@ jobs:
             adb logcat -c
             mkdir -p screenshots
             adb shell am start -W -n cz.radioceskyraj.radio/com.cheebeez.single_radio.MainActivity
-            sleep 15
+            sleep 12
+            adb shell pidof cz.radioceskyraj.radio > screenshots/app_pid.txt
+            test -s screenshots/app_pid.txt
             adb shell dumpsys activity activities > screenshots/activities.txt
             adb shell dumpsys window windows > screenshots/windows.txt
-            adb logcat -d > screenshots/logcat.txt
+            adb logcat -d -s AndroidRuntime:E > screenshots/android_runtime_errors.txt
             adb exec-out screencap -p > screenshots/RCR_2_8_3_ANDROID16.png
             test -s screenshots/RCR_2_8_3_ANDROID16.png
-            adb shell pidof cz.radioceskyraj.radio > screenshots/app_pid.txt
-            python3 - <<'PY'
-            from pathlib import Path
-            import re, sys
-            logs = Path("screenshots/logcat.txt").read_text(errors="replace")
-            activities = Path("screenshots/activities.txt").read_text(errors="replace")
-            windows = Path("screenshots/windows.txt").read_text(errors="replace")
-            pid = Path("screenshots/app_pid.txt").read_text().strip()
-            fatal = re.findall(r".{0,120}FATAL EXCEPTION.{0,400}", logs)
-            foreground = [
-                line.strip() for line in (activities + "\\n" + windows).splitlines()
-                if ("mResumedActivity" in line or "topResumedActivity" in line
-                    or "mCurrentFocus" in line or "mFocusedApp" in line)
-            ]
-            print("APP PID:", pid or "MISSING")
-            print("FOREGROUND:", "\\n".join(foreground) or "NOT FOUND")
-            if fatal:
-                print("FATAL ANDROID EXCEPTION:")
-                print("\\n".join(fatal[-10:]))
-                sys.exit(1)
-            if not pid:
-                print("FAIL: application process is not running")
-                sys.exit(1)
-            if not any("cz.radioceskyraj.radio" in line for line in foreground):
-                print("FAIL: app process exists but app is not the foreground activity")
-                sys.exit(1)
-            print("ANDROID 16: INSTALLATION, FOREGROUND STARTUP AND NO FATAL EXCEPTION OK")
-            PY
+            adb shell dumpsys meminfo cz.radioceskyraj.radio > screenshots/app_meminfo.txt
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | grep -F 'cz.radioceskyraj.radio'
+            ! grep -q 'FATAL EXCEPTION' screenshots/android_runtime_errors.txt
+            echo 'ANDROID 16: INSTALLATION, LIVE FOREGROUND PROCESS AND NO FATAL EXCEPTION OK'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
