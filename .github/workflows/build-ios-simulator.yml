@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.3 - iOS Simulator (no Apple account)
+name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test)
 on:
   push:
     branches: [cool-visual-test]
@@ -41,13 +41,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --user Pillow==12.0.0
-          python3 tools/verify_logo.py
-          python3 tools/prepare_original_flutter.py
+          python3 -m venv "$RUNNER_TEMP/rcr-ios-python"
+          "$RUNNER_TEMP/rcr-ios-python/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/rcr-ios-python/bin/python" -m pip install Pillow==12.0.0
+          "$RUNNER_TEMP/rcr-ios-python/bin/python" tools/verify_logo.py
+          "$RUNNER_TEMP/rcr-ios-python/bin/python" tools/prepare_original_flutter.py
           cd radio_cesky_raj
           flutter create --platforms=ios --org cz.radioceskyraj .
           cd ..
-          python3 tools/prepare_ios_project.py
+          "$RUNNER_TEMP/rcr-ios-python/bin/python" tools/prepare_ios_project.py
 
       - name: Resolve Flutter and CocoaPods dependencies
         working-directory: radio_cesky_raj
@@ -90,7 +92,23 @@ jobs:
           test -s result/RCR_iOS_2_8_3_SIMULATOR.png
           echo "iOS SIMULATOR: app installed and launched"
 
-      - name: Package unsigned simulator app
+      - name: Build unsigned iPhone device application
+        working-directory: radio_cesky_raj
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build ios --no-codesign --release
+          test -d build/ios/iphoneos/Runner.app
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ios/iphoneos/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' build/ios/iphoneos/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' build/ios/iphoneos/Runner.app/Info.plist
+          mkdir -p "$GITHUB_WORKSPACE/result/Payload"
+          ditto build/ios/iphoneos/Runner.app "$GITHUB_WORKSPACE/result/Payload/Runner.app"
+          cd "$GITHUB_WORKSPACE/result"
+          /usr/bin/zip -qry RCR_iOS_2_8_3_UNSIGNED.ipa Payload
+          test -s RCR_iOS_2_8_3_UNSIGNED.ipa
+
+      - name: Package simulator preview
         shell: bash
         run: |
           set -euo pipefail
@@ -100,8 +118,9 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RCR_iOS_2_8_3_SIMULATOR_UNSIGNED
+          name: RCR_iOS_2_8_3_IPHONE_TEST
           path: |
+            result/RCR_iOS_2_8_3_UNSIGNED.ipa
             result/RCR_iOS_2_8_3_SIMULATOR_UNSIGNED.zip
             result/RCR_iOS_2_8_3_SIMULATOR.png
           if-no-files-found: error
