@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, IPA checksum and package validation fix)
+name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, dual animation controller fix)
 on:
   push:
     branches: [cool-visual-test]
