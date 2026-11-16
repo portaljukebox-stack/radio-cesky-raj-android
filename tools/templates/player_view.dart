@@ -448,11 +448,13 @@ class _PulseDot extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: 7,
     height: 7,
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: Color(0xFFA6E81C),
+      color: isOnline ? const Color(0xFFA6E81C) : const Color(0xFFFF647C),
       boxShadow: [BoxShadow(
-        color: Color(0x66A6E81C), blurRadius: 8, spreadRadius: 1,
+        color: isOnline ? const Color(0x66A6E81C) : const Color(0x66FF647C),
+        blurRadius: 8,
+        spreadRadius: 1,
       )],
     ),
   );
