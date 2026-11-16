@@ -624,13 +624,14 @@ vm=vm.replace(old_metadata,new_metadata)
 # This is not a MediaCP admin/API integration or a real-listener counter.
 if "import 'dart:async';" not in vm:
     vm=vm.replace("import 'dart:developer';",
-                  "import 'dart:async';\\nimport 'dart:developer';\\nimport 'dart:io';")
+                  "import 'dart:async';\nimport 'dart:developer';\nimport 'dart:io';")
 vm=vm.replace(
     "  int _artworkRequestId = 0;",
     """  int _artworkRequestId = 0;
   bool isStreamOnline = true;
   int _streamProbeFailures = 0;
   bool _streamProbeInFlight = false;
+  bool _streamMonitorDisposed = false;
   Timer? _streamProbeTimer;
   final HttpClient _streamProbeClient = HttpClient()
     ..connectionTimeout = const Duration(seconds: 5);""",
@@ -639,7 +640,7 @@ vm=vm.replace(
 anchor="    _radioPlayer.metadataStream.listen((value) async {"
 if anchor not in vm:
     sys.exit("STOP: Original metadata listener changed; stream monitor not inserted")
-vm=vm.replace(anchor, "    _startStreamSignalMonitor();\\n\\n"+anchor, 1)
+vm=vm.replace(anchor, "    _startStreamSignalMonitor();\n\n"+anchor, 1)
 
 methods = r'''
   void _startStreamSignalMonitor() {
@@ -682,7 +683,7 @@ methods = r'''
       _streamProbeInFlight = false;
     }
 
-    if (!mounted) return;
+    if (_streamMonitorDisposed) return;
     if (available) {
       _streamProbeFailures = 0;
       if (!isStreamOnline) {
@@ -702,6 +703,7 @@ methods = r'''
 
   @override
   void dispose() {
+    _streamMonitorDisposed = true;
     _streamProbeTimer?.cancel();
     _streamProbeClient.close(force: true);
     super.dispose();
