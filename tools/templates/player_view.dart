@@ -226,7 +226,7 @@ class _PremiumTopBar extends StatelessWidget {
               SizedBox(width: 7),
               Text(isOnline ? 'ŽIVĚ' : 'RÁDIO OFFLINE', style: TextStyle(
                 color: isOnline ? Color(0xFFB8F16B) : Color(0xFFFF8293),
-                letterSpacing: 0.75, fontWeight: FontWeight.w900,
+                fontSize: 9, letterSpacing: 0.75, fontWeight: FontWeight.w900,
               )),
             ],
           ),
@@ -399,10 +399,10 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF14332D),
+        color: widget.isOnline ? const Color(0xFF14332D) : const Color(0xFF421E26),
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: const Color(0xFF75C94A).withOpacity(0.42),
+          color: (widget.isOnline ? const Color(0xFF75C94A) : const Color(0xFFFF647C)).withOpacity(0.55),
         ),
       ),
       child: Row(
