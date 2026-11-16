@@ -234,6 +234,18 @@ class _PremiumTopBar extends StatelessWidget {
   }
 }
 
+class _ListenerProfile {
+  const _ListenerProfile({
+    required this.minimum,
+    required this.maximum,
+    required this.target,
+  });
+
+  final int minimum;
+  final int maximum;
+  final double target;
+}
+
 class _ListenerCountBadge extends StatefulWidget {
   const _ListenerCountBadge();
 
@@ -243,22 +255,62 @@ class _ListenerCountBadge extends StatefulWidget {
 
 class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     with WidgetsBindingObserver {
-  late int _listeners = _estimatedListeners(DateTime.now());
+  final math.Random _random = math.Random();
+  late int _listeners;
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    _listeners = _initialCount(DateTime.now());
     WidgetsBinding.instance.addObserver(this);
     _refreshTimer = Timer.periodic(
-      const Duration(minutes: 1),
+      const Duration(seconds: 5),
       (_) => _refreshCount(),
     );
   }
 
+  int _initialCount(DateTime now) {
+    final profile = _profileAt(now);
+    final spread = math.min(35, (profile.maximum - profile.minimum) ~/ 20);
+    final offset = _random.nextInt(spread * 2 + 1) - spread;
+    return (profile.target.round() + offset)
+        .clamp(profile.minimum, profile.maximum)
+        .toInt();
+  }
+
   void _refreshCount() {
     if (!mounted) return;
-    setState(() => _listeners = _estimatedListeners(DateTime.now()));
+
+    final profile = _profileAt(DateTime.now());
+    final distanceToTrend = profile.target - _listeners;
+
+    // The long-term daily curve gently guides the number up or down.
+    // Small independent movements keep it alive between those trends.
+    var trendStep = 0;
+    if (distanceToTrend.abs() > 12) {
+      final amount = 1 + _random.nextInt(4);
+      trendStep = distanceToTrend > 0 ? amount : -amount;
+    }
+
+    final naturalMovement = _random.nextInt(9) - 4;
+    var change = trendStep + naturalMovement;
+    if (change == 0) {
+      change = _random.nextBool() ? 1 : -1;
+    }
+
+    var next = (_listeners + change)
+        .clamp(profile.minimum, profile.maximum)
+        .toInt();
+
+    // Always show a small movement, even when the value reaches a boundary.
+    if (next == _listeners) {
+      next = _listeners >= profile.maximum
+          ? _listeners - 1
+          : _listeners + 1;
+    }
+
+    setState(() => _listeners = next);
   }
 
   @override
@@ -266,65 +318,41 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     if (state == AppLifecycleState.resumed) _refreshCount();
   }
 
-  static int _estimatedListeners(DateTime now) {
+  static _ListenerProfile _profileAt(DateTime now) {
     final minute = now.hour * 60 + now.minute;
-    if (minute >= 1439) return 500;
-
-    late double base;
-    late double variation;
-    late int lower;
-    late int upper;
 
     if (minute < 360) {
-      // Overnight: 200–500.
-      base = 350;
-      variation = 150;
-      lower = 200;
-      upper = 500;
-    } else if (minute < 540) {
-      // Morning rise: 1,800 at 06:00 to 3,600 at 09:00.
+      return const _ListenerProfile(
+        minimum: 200,
+        maximum: 500,
+        target: 350,
+      );
+    }
+
+    if (minute < 540) {
       final progress = (minute - 360) / 180.0;
-      base = 1800 + 1800 * progress;
-      variation = 110;
-      lower = 1800;
-      upper = 3600;
-    } else if (minute < 960) {
-      // Daytime peak: smoothly rises to 9,580 around 12:30,
-      // then returns towards 3,600 by 16:00.
+      return _ListenerProfile(
+        minimum: 1800,
+        maximum: 3600,
+        target: 1800 + 1800 * progress,
+      );
+    }
+
+    if (minute < 960) {
       final progress = (minute - 540) / 420.0;
-      base = 3600 + 5980 * math.sin(math.pi * progress);
-      variation = 180;
-      lower = 3600;
-      upper = 9580;
-    } else {
-      // Evening: a gradual decline from 3,500 at 16:00 to 500 at midnight.
-      final progress = (minute - 960) / 479.0;
-      base = 3500 - 3000 * progress;
-      variation = 75 * (1 - progress);
-      lower = 500;
-      upper = 3500;
+      return _ListenerProfile(
+        minimum: 3600,
+        maximum: 9580,
+        target: 3600 + 5980 * math.sin(math.pi * progress),
+      );
     }
 
-    // A date-seeded, five-minute smooth random curve makes the display
-    // change naturally without sudden jumps or any network connection.
-    final daySeed = now.year * 100000 + now.month * 1000 + now.day * 10;
-    final bucket = minute ~/ 5;
-    final fraction = (minute % 5) / 5.0;
-
-    double noiseAt(int index) {
-      final random = math.Random(daySeed ^ (index * 7919));
-      return random.nextDouble() * 2 - 1;
-    }
-
-    final startNoise = noiseAt(bucket);
-    final endNoise = noiseAt(bucket + 1);
-    final smooth = fraction * fraction * (3 - 2 * fraction);
-    final noise = startNoise + (endNoise - startNoise) * smooth;
-
-    return (base + noise * variation)
-        .round()
-        .clamp(lower, upper)
-        .toInt();
+    final progress = (minute - 960) / 479.0;
+    return _ListenerProfile(
+      minimum: 500,
+      maximum: 3500,
+      target: 3500 - 3000 * progress,
+    );
   }
 
   String _formatCount(int value) {
