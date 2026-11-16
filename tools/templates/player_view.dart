@@ -151,9 +151,18 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     super.initState();
     _listeners = _initialCount(DateTime.now());
     WidgetsBinding.instance.addObserver(this);
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 5),
-      (_) => _refreshCount(),
+    _scheduleNextRefresh();
+  }
+
+  void _scheduleNextRefresh() {
+    // A slightly different interval makes updates feel less mechanical.
+    _refreshTimer = Timer(
+      Duration(seconds: 4 + _random.nextInt(8)),
+      () {
+        if (!mounted) return;
+        _refreshCount();
+        _scheduleNextRefresh();
+      },
     );
   }
 
@@ -291,7 +300,7 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
           ),
           const SizedBox(width: 6),
           const Text(
-            'POSLUCHAČŮ PRÁVĚ TEĎ',
+            'PULZ RÁDIA',
             style: TextStyle(
               color: Color(0xFFB8F16B),
               fontSize: 8,
