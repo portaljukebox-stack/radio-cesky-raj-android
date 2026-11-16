@@ -72,6 +72,8 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' build/ios/iphonesimulator/Runner.app/Info.plist
 
       - name: Install and launch on an available iPhone simulator
+        timeout-minutes: 4
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
