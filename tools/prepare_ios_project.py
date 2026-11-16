@@ -151,6 +151,7 @@ if podfile.is_file():
         text = "platform :ios, '12.0'\n" + text
     podfile.write_text(text, encoding="utf-8")
 
-print("Removed stale Firebase plist reference from iOS project (no Firebase package is used).")\nprint("iOS project configured: Rádio Český ráj, original icon, approved splash,")
+print("Removed stale Firebase plist reference from iOS project (no Firebase package is used).")
+print("iOS project configured: Rádio Český ráj, original icon, approved splash,")
 print("3.62-second Flutter startup, background audio, bundle ID cz.radioceskyraj.radio.")
 print("No Apple Developer account, certificate, provisioning profile, or signing is used.")
