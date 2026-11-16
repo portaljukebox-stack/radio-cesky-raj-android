@@ -53,6 +53,27 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           root=Path.home()/'.pub-cache/hosted/pub.dev/radio_player-1.2.1/android/src/main'
+          service=root/'kotlin/com/cheebeez/radio_player/RadioPlayerService.kt'
+          if not service.is_file():
+              raise SystemExit('STOP: exact pinned RadioPlayerService.kt not found')
+          source=service.read_text(encoding='utf-8')
+          dangerous='android.os.Process.killProcess(android.os.Process.myPid());'
+          if source.count(dangerous) != 1:
+              raise SystemExit('STOP: expected exactly one unsafe process-kill call in RadioPlayerService.onDestroy')
+          source=source.replace(
+              dangerous,
+              '// RCR FIX: a service must never terminate the entire Android application process.'
+          )
+          service.write_text(source,encoding='utf-8')
+          assert 'killProcess' not in source and 'myPid()' not in source
+          print('FIX APPLIED: removed process-wide SIGKILL from RadioPlayerService.onDestroy')
+          print('=== FULL RADIO_PLAYER 1.2.1 SERVICE SOURCE ===')
+          print(source)
+          print('=== END RADIO_PLAYER SERVICE SOURCE ===')
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path.home()/'.pub-cache/hosted/pub.dev/radio_player-1.2.1/android/src/main'
           print('=== PINNED RADIO_PLAYER 1.2.1 ANDROID SOURCE DIAGNOSTIC ===')
           if not root.is_dir():
               raise SystemExit('STOP: radio_player 1.2.1 Android source not found in pub cache')
@@ -208,7 +229,7 @@ jobs:
             adb logcat -c
             mkdir -p screenshots
             adb shell am start -W -n cz.radioceskyraj.radio/com.cheebeez.single_radio.MainActivity
-            sleep 10
+            sleep 12
             adb shell pidof cz.radioceskyraj.radio > screenshots/app_pid.txt || true
             adb shell ps -A > screenshots/processes.txt
             adb shell dumpsys activity activities > screenshots/activities.txt
@@ -223,15 +244,22 @@ jobs:
             grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|cz.radioceskyraj.radio' screenshots/activities.txt | tail -30 || true
             echo '=== APP EXIT / CRASH DIAGNOSTICS ==='
             grep -Ei 'FATAL EXCEPTION|Process .* has died|Force finishing|Fatal signal|SIGKILL|SIG 9|killProcess|ExoPlayerImpl: Release|radio_player|AndroidRuntime' screenshots/logcat.txt | tail -100 || true
-            if ! grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' screenshots/activities.txt | grep -q 'cz.radioceskyraj.radio'; then
-              echo 'FAIL: Rádio Český ráj activity is no longer in foreground after startup'
-              exit 1
-            fi
-            if grep -q 'FATAL EXCEPTION' screenshots/logcat.txt; then
-              echo 'FAIL: Android runtime fatal exception detected'
-              exit 1
-            fi
-            echo 'ANDROID 16: APP ACTIVITY REMAINS IN FOREGROUND'
+            python3 - <<'PY'
+            from pathlib import Path
+            import re
+            pid=Path('screenshots/app_pid.txt').read_text().strip()
+            activities=Path('screenshots/activities.txt').read_text(errors='replace')
+            log=Path('screenshots/logcat.txt').read_text(errors='replace')
+            if not pid:
+                raise SystemExit('FAIL: application process is not running after 12 seconds')
+            if not re.search(r'(?:mResumedActivity|topResumedActivity|ResumedActivity).*cz\\.radioceskyraj\\.radio', activities):
+                raise SystemExit('FAIL: Rádio Český ráj is not the resumed foreground activity')
+            if 'FATAL EXCEPTION' in log:
+                raise SystemExit('FAIL: Android runtime fatal exception detected')
+            if re.search(r'ActivityManager: Process cz\\.radioceskyraj\\.radio .* has died', log):
+                raise SystemExit('FAIL: Rádio Český ráj process died during startup')
+            print('ANDROID 16 PASS: app process',pid,'is alive and MainActivity remains in foreground')
+            PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
