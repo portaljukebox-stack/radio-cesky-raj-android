@@ -619,6 +619,96 @@ if old_metadata not in vm:
     sys.exit("STOP: Original metadata listener changed")
 vm=vm.replace("  Image? artwork;", "  Image? artwork;\n  int _artworkRequestId = 0;", 1)
 vm=vm.replace(old_metadata,new_metadata)
+
+# Directly test whether the public stream is delivering audio bytes.
+# This is not a MediaCP admin/API integration or a real-listener counter.
+if "import 'dart:async';" not in vm:
+    vm=vm.replace("import 'dart:developer';",
+                  "import 'dart:async';\\nimport 'dart:developer';\\nimport 'dart:io';")
+vm=vm.replace(
+    "  int _artworkRequestId = 0;",
+    """  int _artworkRequestId = 0;
+  bool isStreamOnline = true;
+  int _streamProbeFailures = 0;
+  bool _streamProbeInFlight = false;
+  Timer? _streamProbeTimer;
+  final HttpClient _streamProbeClient = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 5);""",
+    1,
+)
+anchor="    _radioPlayer.metadataStream.listen((value) async {"
+if anchor not in vm:
+    sys.exit("STOP: Original metadata listener changed; stream monitor not inserted")
+vm=vm.replace(anchor, "    _startStreamSignalMonitor();\\n\\n"+anchor, 1)
+
+methods = r'''
+  void _startStreamSignalMonitor() {
+    _checkStreamSignal();
+    _streamProbeTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _checkStreamSignal(),
+    );
+  }
+
+  Future<void> _checkStreamSignal() async {
+    if (_streamProbeInFlight) return;
+    _streamProbeInFlight = true;
+    var available = false;
+    HttpClientRequest? request;
+    try {
+      request = await _streamProbeClient
+          .getUrl(Uri.parse(Config.streamUrl))
+          .timeout(const Duration(seconds: 6));
+      request.followRedirects = true;
+      request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-0');
+      request.headers.set(HttpHeaders.connectionHeader, 'close');
+      request.headers.set(HttpHeaders.userAgentHeader, 'RadioCeskyRaj/2.8.3');
+      final response = await request.close().timeout(const Duration(seconds: 7));
+      final contentType = response.headers.contentType?.mimeType.toLowerCase() ?? '';
+      final isAudioResponse = contentType.startsWith('audio/') ||
+          contentType == 'application/octet-stream';
+      if (response.statusCode >= 200 &&
+          response.statusCode < 300 &&
+          isAudioResponse) {
+        await response.first.timeout(const Duration(seconds: 6));
+        available = true;
+      } else {
+        await response.drain<void>().timeout(const Duration(seconds: 2));
+      }
+    } catch (_) {
+      request?.abort();
+      available = false;
+    } finally {
+      _streamProbeInFlight = false;
+    }
+
+    if (!mounted) return;
+    if (available) {
+      _streamProbeFailures = 0;
+      if (!isStreamOnline) {
+        isStreamOnline = true;
+        notifyListeners();
+      }
+    } else {
+      _streamProbeFailures++;
+      // Require two failed checks to avoid a false OFFLINE warning
+      // during a short network interruption.
+      if (_streamProbeFailures >= 2 && isStreamOnline) {
+        isStreamOnline = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _streamProbeTimer?.cancel();
+    _streamProbeClient.close(force: true);
+    super.dispose();
+  }
+
+  void play() {'''
+
 write("lib/screens/player/player_viewmodel.dart",vm)
 print("Original player now uses exact wide station logo + optional real music artwork")
 
