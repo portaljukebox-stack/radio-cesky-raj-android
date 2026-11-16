@@ -65,7 +65,7 @@ jobs:
         working-directory: radio_cesky_raj
         run: |
           set -euo pipefail
-          flutter build ios --simulator --no-codesign --debug
+          flutter build ios --simulator --no-codesign --debug --build-name=2.8.3 --build-number=44
           test -d build/ios/iphonesimulator/Runner.app
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ios/iphonesimulator/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' build/ios/iphonesimulator/Runner.app/Info.plist
@@ -92,12 +92,12 @@ jobs:
           test -s result/RCR_iOS_2_8_3_SIMULATOR.png
           echo "iOS SIMULATOR: app installed and launched"
 
-      - name: Build unsigned iPhone device application
+      - name: Build unsigned iPhone device application (version 2.8.3)
         working-directory: radio_cesky_raj
         shell: bash
         run: |
           set -euo pipefail
-          flutter build ios --no-codesign --release
+          flutter build ios --no-codesign --release --build-name=2.8.3 --build-number=44
           test -d build/ios/iphoneos/Runner.app
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ios/iphoneos/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' build/ios/iphoneos/Runner.app/Info.plist
