@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, dual animation controller fix)
+name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, version metadata fix)
 on:
   push:
     branches: [cool-visual-test]
@@ -67,6 +67,8 @@ jobs:
           set -euo pipefail
           flutter build ios --simulator --no-codesign --debug --build-name=2.8.3 --build-number=44
           test -d build/ios/iphonesimulator/Runner.app
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 2.8.3' build/ios/iphonesimulator/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 44' build/ios/iphonesimulator/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ios/iphonesimulator/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' build/ios/iphonesimulator/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' build/ios/iphonesimulator/Runner.app/Info.plist
@@ -101,6 +103,8 @@ jobs:
           set -euo pipefail
           flutter build ios --no-codesign --release --build-name=2.8.3 --build-number=44
           test -d build/ios/iphoneos/Runner.app
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleShortVersionString 2.8.3' build/ios/iphoneos/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Set :CFBundleVersion 44' build/ios/iphoneos/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ios/iphoneos/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' build/ios/iphoneos/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' build/ios/iphoneos/Runner.app/Info.plist
