@@ -22,7 +22,7 @@ class PlayerView extends StatefulWidget {
 }
 
 class _PlayerViewState extends State<PlayerView>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final PlayerViewModel viewModel =
       Provider.of<PlayerViewModel>(context, listen: true);
   late final AnimationController _eq = AnimationController(
