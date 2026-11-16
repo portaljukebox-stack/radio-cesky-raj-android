@@ -300,7 +300,7 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
           ),
           const SizedBox(width: 6),
           const Text(
-            'PULZ RÁDIA',
+            'PRÁVĚ POSLOUCHÁ',
             style: TextStyle(
               color: Color(0xFFB8F16B),
               fontSize: 8,
