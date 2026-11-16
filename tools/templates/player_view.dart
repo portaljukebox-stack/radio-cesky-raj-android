@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -96,7 +97,12 @@ class _PlayerViewState extends State<PlayerView>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const _PremiumTopBar(),
-                          SizedBox(height: compact ? 16 : 22),
+                          const SizedBox(height: 9),
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: _ListenerCountBadge(),
+                          ),
+                          SizedBox(height: compact ? 12 : 16),
                           _PremiumArtwork(
                             size: artSize,
                             isPlaying: viewModel.isPlaying,
@@ -223,6 +229,162 @@ class _PremiumTopBar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ListenerCountBadge extends StatefulWidget {
+  const _ListenerCountBadge();
+
+  @override
+  State<_ListenerCountBadge> createState() => _ListenerCountBadgeState();
+}
+
+class _ListenerCountBadgeState extends State<_ListenerCountBadge>
+    with WidgetsBindingObserver {
+  late int _listeners = _estimatedListeners(DateTime.now());
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _refreshCount(),
+    );
+  }
+
+  void _refreshCount() {
+    if (!mounted) return;
+    setState(() => _listeners = _estimatedListeners(DateTime.now()));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshCount();
+  }
+
+  static int _estimatedListeners(DateTime now) {
+    final minute = now.hour * 60 + now.minute;
+    if (minute >= 1439) return 500;
+
+    late double base;
+    late double variation;
+    late int lower;
+    late int upper;
+
+    if (minute < 360) {
+      // Overnight: 200–500.
+      base = 350;
+      variation = 150;
+      lower = 200;
+      upper = 500;
+    } else if (minute < 540) {
+      // Morning rise: 1,800 at 06:00 to 3,600 at 09:00.
+      final progress = (minute - 360) / 180.0;
+      base = 1800 + 1800 * progress;
+      variation = 110;
+      lower = 1800;
+      upper = 3600;
+    } else if (minute < 960) {
+      // Daytime peak: smoothly rises to 9,580 around 12:30,
+      // then returns towards 3,600 by 16:00.
+      final progress = (minute - 540) / 420.0;
+      base = 3600 + 5980 * math.sin(math.pi * progress);
+      variation = 180;
+      lower = 3600;
+      upper = 9580;
+    } else {
+      // Evening: a gradual decline from 3,500 at 16:00 to 500 at midnight.
+      final progress = (minute - 960) / 479.0;
+      base = 3500 - 3000 * progress;
+      variation = 75 * (1 - progress);
+      lower = 500;
+      upper = 3500;
+    }
+
+    // A date-seeded, five-minute smooth random curve makes the display
+    // change naturally without sudden jumps or any network connection.
+    final daySeed = now.year * 100000 + now.month * 1000 + now.day * 10;
+    final bucket = minute ~/ 5;
+    final fraction = (minute % 5) / 5.0;
+
+    double noiseAt(int index) {
+      final random = math.Random(daySeed ^ (index * 7919));
+      return random.nextDouble() * 2 - 1;
+    }
+
+    final startNoise = noiseAt(bucket);
+    final endNoise = noiseAt(bucket + 1);
+    final smooth = fraction * fraction * (3 - 2 * fraction);
+    final noise = startNoise + (endNoise - startNoise) * smooth;
+
+    return (base + noise * variation)
+        .round()
+        .clamp(lower, upper)
+        .toInt();
+  }
+
+  String _formatCount(int value) {
+    final digits = value.toString();
+    final output = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) output.write(' ');
+      output.write(digits[i]);
+    }
+    return output.toString();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14332D),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: const Color(0xFF75C94A).withOpacity(0.42),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.headphones_rounded,
+            size: 15,
+            color: Color(0xFFA6E81C),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            _formatCount(_listeners),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              height: 1,
+              fontWeight: FontWeight.w900,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'POSLUCHAČŮ PRÁVĚ TEĎ',
+            style: TextStyle(
+              color: Color(0xFFB8F16B),
+              fontSize: 8,
+              letterSpacing: 0.55,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
