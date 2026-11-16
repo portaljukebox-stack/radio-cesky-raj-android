@@ -710,6 +710,11 @@ methods = r'''
   }
 
   void play() {'''
+if "  void _startStreamSignalMonitor()" in vm:
+    sys.exit("STOP: Stream monitor methods already exist in generated view model")
+if "  void play() {" not in vm:
+    sys.exit("STOP: Original play method not found")
+vm=vm.replace("  void play() {", methods, 1)
 
 write("lib/screens/player/player_viewmodel.dart",vm)
 print("Original player now uses exact wide station logo + optional real music artwork")
