@@ -97,11 +97,11 @@ class _PlayerViewState extends State<PlayerView>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const _PremiumTopBar(),
+                          _PremiumTopBar(isOnline: viewModel.isStreamOnline),
                           const SizedBox(height: 9),
-                          const Align(
+                          Align(
                             alignment: Alignment.centerRight,
-                            child: _ListenerCountBadge(),
+                            child: _ListenerCountBadge(isOnline: viewModel.isStreamOnline),
                           ),
                           SizedBox(height: compact ? 12 : 16),
                           _PremiumArtwork(
@@ -174,7 +174,9 @@ class _PlayerViewState extends State<PlayerView>
 }
 
 class _PremiumTopBar extends StatelessWidget {
-  const _PremiumTopBar();
+  const _PremiumTopBar({required this.isOnline});
+
+  final bool isOnline;
 
   @override
   Widget build(BuildContext context) {
@@ -213,17 +215,17 @@ class _PremiumTopBar extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
           decoration: BoxDecoration(
-            color: const Color(0xFF193B31),
+            color: isOnline ? const Color(0xFF193B31) : const Color(0xFF421E26),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: const Color(0xFF75C94A).withOpacity(0.55)),
+            border: Border.all(color: (isOnline ? const Color(0xFF75C94A) : const Color(0xFFFF647C)).withOpacity(0.65)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _PulseDot(),
+              _PulseDot(isOnline: isOnline),
               SizedBox(width: 7),
-              Text('VYSÍLÁME 24/7', style: TextStyle(
-                color: Color(0xFFB8F16B), fontSize: 9,
+              Text(isOnline ? 'ŽIVĚ' : 'RÁDIO OFFLINE', style: TextStyle(
+                color: isOnline ? Color(0xFFB8F16B) : Color(0xFFFF8293),
                 letterSpacing: 0.75, fontWeight: FontWeight.w900,
               )),
             ],
@@ -247,7 +249,9 @@ class _ListenerProfile {
 }
 
 class _ListenerCountBadge extends StatefulWidget {
-  const _ListenerCountBadge();
+  const _ListenerCountBadge({required this.isOnline});
+
+  final bool isOnline;
 
   @override
   State<_ListenerCountBadge> createState() => _ListenerCountBadgeState();
@@ -262,7 +266,7 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
   @override
   void initState() {
     super.initState();
-    _listeners = _initialCount(DateTime.now());
+    _listeners = widget.isOnline ? _initialCount(DateTime.now()) : 0;
     WidgetsBinding.instance.addObserver(this);
     _scheduleNextRefresh();
   }
@@ -288,8 +292,17 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
         .toInt();
   }
 
+  void didUpdateWidget(covariant _ListenerCountBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isOnline != widget.isOnline) {
+      setState(() {
+        _listeners = widget.isOnline ? _initialCount(DateTime.now()) : 0;
+      });
+    }
+  }
+
   void _refreshCount() {
-    if (!mounted) return;
+    if (!mounted || !widget.isOnline) return;
 
     final profile = _profileAt(DateTime.now());
     final distanceToTrend = profile.target - _listeners;
@@ -395,10 +408,10 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.headphones_rounded,
             size: 15,
-            color: Color(0xFFA6E81C),
+            color: widget.isOnline ? const Color(0xFFA6E81C) : const Color(0xFFFF647C),
           ),
           const SizedBox(width: 7),
           Text(
@@ -412,10 +425,10 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
             ),
           ),
           const SizedBox(width: 6),
-          const Text(
-            'PRÁVĚ POSLOUCHÁ',
+          Text(
+            widget.isOnline ? 'PRÁVĚ POSLOUCHÁ' : 'POSLUCHAČŮ',
             style: TextStyle(
-              color: Color(0xFFB8F16B),
+              color: widget.isOnline ? const Color(0xFFB8F16B) : const Color(0xFFFF8293),
               fontSize: 8,
               letterSpacing: 0.55,
               fontWeight: FontWeight.w800,
@@ -428,7 +441,9 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
 }
 
 class _PulseDot extends StatelessWidget {
-  const _PulseDot();
+  const _PulseDot({required this.isOnline});
+
+  final bool isOnline;
   @override
   Widget build(BuildContext context) => Container(
     width: 7,
