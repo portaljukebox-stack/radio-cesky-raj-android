@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test)
+name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, Firebase reference cleanup)
 on:
   push:
     branches: [cool-visual-test]
