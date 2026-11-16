@@ -61,11 +61,11 @@ jobs:
           pod install
           cd ..
 
-      - name: Build unsigned iOS Simulator application
+      - name: Build unsigned iOS Simulator application (debug; simulator does not support release)
         working-directory: radio_cesky_raj
         run: |
           set -euo pipefail
-          flutter build ios --simulator --no-codesign --release
+          flutter build ios --simulator --no-codesign --debug
           test -d build/ios/iphonesimulator/Runner.app
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/ios/iphonesimulator/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' build/ios/iphonesimulator/Runner.app/Info.plist
