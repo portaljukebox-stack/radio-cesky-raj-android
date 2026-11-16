@@ -244,22 +244,11 @@ jobs:
             grep -E 'mResumedActivity|topResumedActivity|ResumedActivity|cz.radioceskyraj.radio' screenshots/activities.txt | tail -30 || true
             echo '=== APP EXIT / CRASH DIAGNOSTICS ==='
             grep -Ei 'FATAL EXCEPTION|Process .* has died|Force finishing|Fatal signal|SIGKILL|SIG 9|killProcess|ExoPlayerImpl: Release|radio_player|AndroidRuntime' screenshots/logcat.txt | tail -100 || true
-            python3 - <<'PY'
-            from pathlib import Path
-            import re
-            pid=Path('screenshots/app_pid.txt').read_text().strip()
-            activities=Path('screenshots/activities.txt').read_text(errors='replace')
-            log=Path('screenshots/logcat.txt').read_text(errors='replace')
-            if not pid:
-                raise SystemExit('FAIL: application process is not running after 12 seconds')
-            if not re.search(r'(?:mResumedActivity|topResumedActivity|ResumedActivity).*cz\\.radioceskyraj\\.radio', activities):
-                raise SystemExit('FAIL: Rádio Český ráj is not the resumed foreground activity')
-            if 'FATAL EXCEPTION' in log:
-                raise SystemExit('FAIL: Android runtime fatal exception detected')
-            if re.search(r'ActivityManager: Process cz\\.radioceskyraj\\.radio .* has died', log):
-                raise SystemExit('FAIL: Rádio Český ráj process died during startup')
-            print('ANDROID 16 PASS: app process',pid,'is alive and MainActivity remains in foreground')
-            PY
+            test -s screenshots/app_pid.txt || { echo 'FAIL: application process is not running after 12 seconds'; exit 1; }
+            grep -Eq '^[[:space:]]*(mResumedActivity|topResumedActivity|ResumedActivity)[[:space:]:=].*cz[.]radioceskyraj[.]radio/' screenshots/activities.txt || { echo 'FAIL: Rádio Český ráj is not the resumed foreground activity'; exit 1; }
+            if grep -q 'FATAL EXCEPTION' screenshots/logcat.txt; then echo 'FAIL: Android runtime fatal exception detected'; exit 1; fi
+            if grep -Eq 'ActivityManager: Process cz[.]radioceskyraj[.]radio .* has died' screenshots/logcat.txt; then echo 'FAIL: Rádio Český ráj process died during startup'; exit 1; fi
+            echo 'ANDROID 16 PASS: app process' "$(cat screenshots/app_pid.txt)" 'is alive and MainActivity remains in foreground'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
