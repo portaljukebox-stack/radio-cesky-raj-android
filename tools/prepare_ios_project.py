@@ -120,6 +120,19 @@ with info_path.open("wb") as f:
 # Stable bundle ID for later signing. Simulator builds remain completely unsigned.
 pbx_path = IOS / "Runner.xcodeproj/project.pbxproj"
 pbx = pbx_path.read_text(encoding="utf-8")
+
+# The original Android-derived project retained an Xcode resource reference to
+# a private Firebase plist. The preparation deliberately excludes that secret
+# file, and Firebase packages are removed from pubspec, so remove only the
+# stale Xcode project lines that refer to this absent resource.
+pbx_lines = pbx.splitlines()
+pbx_lines_before = len(pbx_lines)
+pbx_lines = [line for line in pbx_lines if "GoogleService-Info.plist" not in line]
+if len(pbx_lines) == pbx_lines_before and "GoogleService-Info.plist" in pbx:
+    sys.exit("STOP: could not safely remove stale GoogleService-Info.plist references")
+pbx = "\\n".join(pbx_lines) + "\\n"
+if "GoogleService-Info.plist" in pbx:
+    sys.exit("STOP: stale GoogleService-Info.plist reference remains")
 pbx, count = re.subn(
     r"PRODUCT_BUNDLE_IDENTIFIER = [^;]+;",
     "PRODUCT_BUNDLE_IDENTIFIER = cz.radioceskyraj.radio;",
@@ -138,6 +151,6 @@ if podfile.is_file():
         text = "platform :ios, '12.0'\n" + text
     podfile.write_text(text, encoding="utf-8")
 
-print("iOS project configured: Rádio Český ráj, original icon, approved splash,")
+print("Removed stale Firebase plist reference from iOS project (no Firebase package is used).")\nprint("iOS project configured: Rádio Český ráj, original icon, approved splash,")
 print("3.62-second Flutter startup, background audio, bundle ID cz.radioceskyraj.radio.")
 print("No Apple Developer account, certificate, provisioning profile, or signing is used.")
