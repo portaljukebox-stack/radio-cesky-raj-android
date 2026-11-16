@@ -1,4 +1,4 @@
-name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, Xcode project line endings and signing cleanup)
+name: RADIO CESKY RAJ 2.8.3 - iPhone IPA and Simulator (free test, IPA checksum and package validation fix)
 on:
   push:
     branches: [cool-visual-test]
@@ -113,7 +113,12 @@ jobs:
         run: |
           set -euo pipefail
           ditto -c -k --sequesterRsrc --keepParent radio_cesky_raj/build/ios/iphonesimulator/Runner.app result/RCR_iOS_2_8_3_SIMULATOR_UNSIGNED.zip
-          shasum -a 256 result/*
+          # Hash files only; result/Payload is a directory created for the IPA.
+          find result -maxdepth 1 -type f -print0 | sort -z | xargs -0 shasum -a 256
+          /usr/bin/unzip -t result/RCR_iOS_2_8_3_UNSIGNED.ipa
+          test -d result/Payload/Runner.app
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' result/Payload/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' result/Payload/Runner.app/Info.plist
           ls -lh result/*
 
       - uses: actions/upload-artifact@v4
