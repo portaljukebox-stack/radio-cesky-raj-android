@@ -180,7 +180,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
             test -s apk/Radio_Cesky_Raj_2_8_3_X86_64.apk
             adb install -r apk/Radio_Cesky_Raj_2_8_3_X86_64.apk
             adb logcat -c
@@ -190,11 +190,9 @@ jobs:
             adb exec-out screencap -p > screenshots/RCR_2_8_3_ANDROID16.png
             test -s screenshots/RCR_2_8_3_ANDROID16.png
             adb shell pidof cz.radioceskyraj.radio
-            FATAL_LOG="$(adb logcat -d -s AndroidRuntime:E || true)"
-            if printf '%s\\n' "$FATAL_LOG" | grep -q 'FATAL EXCEPTION'
-            then
+            if adb logcat -d -s AndroidRuntime:E | grep -q 'FATAL EXCEPTION'; then
               echo 'AndroidRuntime fatal exception detected'
-              printf '%s\\n' "$FATAL_LOG" | tail -100
+              adb logcat -d -s AndroidRuntime:E | tail -100
               exit 1
             fi
             echo 'ANDROID 16: INSTALLATION AND STARTUP OK'
