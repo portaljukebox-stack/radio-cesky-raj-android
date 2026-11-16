@@ -1,0 +1,69 @@
+name: Inspect original radio player stream state
+on:
+  push:
+    branches: [cool-visual-test]
+    paths:
+      - '.github/workflows/inspect-radio-source.yml'
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract original Flutter source and inspect stream configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import tempfile, shutil
+          archive = Path('rohozec_radio (2).zip')
+          root = Path('inspect-output')
+          root.mkdir()
+          with tempfile.TemporaryDirectory() as tmp:
+              with ZipFile(archive) as z:
+                  z.extractall(tmp)
+              choices = [p.parent for p in Path(tmp).rglob('pubspec.yaml')
+                         if (p.parent / 'lib/main.dart').is_file()]
+              if not choices:
+                  raise SystemExit('Original Flutter project not found in archive')
+              project = sorted(choices, key=lambda p: len(p.parts))[0]
+              wanted = [
+                  'lib/screens/player/player_viewmodel.dart',
+                  'lib/screens/player/player_view.dart',
+                  'lib/config.dart',
+                  'lib/config/config.dart',
+                  'lib/configuration.dart',
+                  'pubspec.yaml',
+              ]
+              for rel in wanted:
+                  src = project / rel
+                  if src.is_file():
+                      dst = root / rel.replace('/', '__')
+                      shutil.copy2(src, dst)
+                      print(f'\n===== {rel} =====')
+                      print(src.read_text(encoding='utf-8', errors='replace')[:24000])
+              print('\n===== CONFIG / PLAYER REFERENCES =====')
+              for src in (project / 'lib').rglob('*.dart'):
+                  try:
+                      lines = src.read_text(encoding='utf-8').splitlines()
+                  except Exception:
+                      continue
+                  selected = [(i+1,line) for i,line in enumerate(lines)
+                              if any(k in line.lower() for k in
+                                ('streamurl','stream_url','radioplayer','playbackstate',
+                                 'isplaying','playerstate','url:'))]
+                  if selected:
+                      print(f'--- {src.relative_to(project)} ---')
+                      for n,line in selected[:100]:
+                          print(f'{n}: {line}')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCR_ORIGINAL_PLAYER_SOURCE_INSPECTION
+          path: inspect-output/
+          if-no-files-found: warn
+          retention-days: 7
