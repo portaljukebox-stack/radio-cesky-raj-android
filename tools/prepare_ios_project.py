@@ -130,7 +130,7 @@ pbx_lines_before = len(pbx_lines)
 pbx_lines = [line for line in pbx_lines if "GoogleService-Info.plist" not in line]
 if len(pbx_lines) == pbx_lines_before and "GoogleService-Info.plist" in pbx:
     sys.exit("STOP: could not safely remove stale GoogleService-Info.plist references")
-pbx = "\\n".join(pbx_lines) + "\\n"
+pbx = "\n".join(pbx_lines) + "\n"
 if "GoogleService-Info.plist" in pbx:
     sys.exit("STOP: stale GoogleService-Info.plist reference remains")
 pbx, count = re.subn(
@@ -141,6 +141,10 @@ pbx, count = re.subn(
 if count < 1:
     stop("could not set the iOS bundle identifier")
 pbx = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [^;]+;", "IPHONEOS_DEPLOYMENT_TARGET = 12.0;", pbx)
+# Remove stale signing settings copied from an unrelated previous iOS target.
+pbx = re.sub(r"DEVELOPMENT_TEAM = [^;]*;", "DEVELOPMENT_TEAM = \"\";", pbx)
+pbx = re.sub(r'PROVISIONING_PROFILE_SPECIFIER(?:\\[sdk=iphoneos\\*\\])? = [^;]*;', 'PROVISIONING_PROFILE_SPECIFIER = \"\";', pbx)
+pbx = re.sub(r'CODE_SIGN_STYLE = [^;]*;', 'CODE_SIGN_STYLE = Automatic;', pbx)
 pbx_path.write_text(pbx, encoding="utf-8")
 
 podfile = IOS / "Podfile"
