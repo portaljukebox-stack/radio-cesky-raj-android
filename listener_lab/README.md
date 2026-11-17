@@ -39,12 +39,12 @@ testovacích dat.
 ## Android
 
 Větev `listener-lab` má vlastní workflow **RCR PRIVATE LISTENER LAB**.
-Automatická testovací sestava používá místní náhled s maximem 800; ten
-nevyžaduje VPS, ale nezaručuje přesnou shodu telefonů s chybně nastavenými
-hodinami či pásmem. Po zpřístupnění statického JSON přes HTTPS spusťte
-workflow ručně s parametrem `listener_url`. Takto sestavené telefony načtou
-stejný snímek z VPS. Krátký rozdíl v okamžiku obnovy je dán sítí a
-desetisekundovým intervalem dotazů.
+Automatická testovací sestava bez `listener_url` čte pouze skutečný společný
+počet `connections` z veřejného MediaCP JSON. Žádný počet neposlouchá ani
+nevypočítává podle času telefonu. Po zpřístupnění statického JSON přes HTTPS
+spusťte workflow ručně s parametrem `listener_url`. Takto sestavené telefony
+načtou stejný testovací snímek z VPS. Krátký rozdíl v okamžiku obnovy je dán
+sítí a desetisekundovým intervalem dotazů.
 
 Artefakty jsou podepsané dočasným testovacím klíčem a nejsou distribuční
 verzí pro Google Play.

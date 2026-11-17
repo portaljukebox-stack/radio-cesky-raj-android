@@ -3,14 +3,14 @@ on:
   push:
     branches: [listener-lab]
     paths:
-      - '.github/workflows/build-cool-test.yml'
+      - '.github/workflows/build-listener-lab.yml'
       - 'tools/prepare_original_flutter.py'
       - 'tools/templates/**'
       - 'listener_lab/**'
   workflow_dispatch:
     inputs:
       listener_url:
-        description: 'Optional HTTPS URL of the private VPS JSON snapshot (empty = local 800 preview)'
+        description: 'Optional HTTPS URL of the private VPS JSON snapshot (empty = public real MediaCP connections)'
         required: false
         type: string
 jobs:
@@ -36,6 +36,15 @@ jobs:
           python3 -m pip install --user Pillow==12.0.0
           python3 tools/verify_logo.py
           python3 tools/prepare_original_flutter.py
+          python3 - <<'PY'
+          from pathlib import Path
+          player = Path('radio_cesky_raj/lib/screens/player/player_view.dart').read_text()
+          assert '_previewCount' not in player
+          assert 'RCR_LISTENER_LAB_PEAK' not in player
+          assert 'https://portal.juke-box.cz:2020/json/stream/radioceskyraj' in player
+          assert 'RCR_LISTENER_LAB_URL' in player
+          print('COUNT SOURCE: only shared VPS JSON or shared MediaCP JSON')
+          PY
           AAPT2=$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name aapt2 -type f | sort -V | tail -1)
           test -x "$AAPT2"
           echo "New Android Asset Packaging Tool: $AAPT2"
@@ -112,8 +121,7 @@ jobs:
             case "$RCR_LAB_URL" in https://*) ;; *) echo 'Lab URL must use HTTPS'; exit 1;; esac
           fi
           flutter build apk --release --split-per-abi --no-pub \
-            --dart-define=RCR_LISTENER_LAB_URL="$RCR_LAB_URL" \
-            --dart-define=RCR_LISTENER_LAB_PEAK=800
+            --dart-define=RCR_LISTENER_LAB_URL="$RCR_LAB_URL"
       - name: Validate APKs, names and signing
         shell: bash
         run: |

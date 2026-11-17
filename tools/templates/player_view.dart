@@ -249,11 +249,12 @@ class _ListenerCountBadge extends StatefulWidget {
 
 class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     with WidgetsBindingObserver {
-  // Isolated private test build. With a configured URL every phone reads the
-  // same VPS-published minute snapshot. With no URL, preview the layout locally.
-  static const String _endpoint = String.fromEnvironment('RCR_LISTENER_LAB_URL');
-  static const int _previewPeak =
-      int.fromEnvironment('RCR_LISTENER_LAB_PEAK', defaultValue: 800);
+  // All phones read a shared source. The optional lab URL replaces the public
+  // MediaCP source only after the VPS minute snapshot is available.
+  static const String _labEndpoint =
+      String.fromEnvironment('RCR_LISTENER_LAB_URL');
+  static const String _realEndpoint =
+      'https://portal.juke-box.cz:2020/json/stream/radioceskyraj';
   final HttpClient _client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 7);
   int? _listeners;
@@ -263,8 +264,7 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
   @override
   void initState() {
     super.initState();
-    _listeners = widget.isOnline && _endpoint.isEmpty
-        ? _previewCount(DateTime.now()) : (widget.isOnline ? null : 0);
+    _listeners = widget.isOnline ? null : 0;
     WidgetsBinding.instance.addObserver(this);
     _refreshCount();
     _refreshTimer = Timer.periodic(
@@ -280,23 +280,18 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     if (!widget.isOnline) {
       setState(() => _listeners = 0);
     } else {
-      setState(() => _listeners = _endpoint.isEmpty
-          ? _previewCount(DateTime.now()) : null);
+      setState(() => _listeners = null);
       _refreshCount();
     }
   }
 
   Future<void> _refreshCount() async {
     if (!mounted || !widget.isOnline || _requestInProgress) return;
-    if (_endpoint.isEmpty) {
-      final preview = _previewCount(DateTime.now());
-      if (_listeners != preview) setState(() => _listeners = preview);
-      return;
-    }
     _requestInProgress = true;
     int? next;
     try {
-      final request = await _client.getUrl(Uri.parse(_endpoint))
+      final endpoint = _labEndpoint.isEmpty ? _realEndpoint : _labEndpoint;
+      final request = await _client.getUrl(Uri.parse(endpoint))
           .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
@@ -306,7 +301,8 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
         final body = await utf8.decoder.bind(response).join()
             .timeout(const Duration(seconds: 8));
         final payload = jsonDecode(body);
-        if (payload is Map<String, dynamic> && payload['test_mode'] == true) {
+        if (payload is Map<String, dynamic> &&
+            _labEndpoint.isNotEmpty && payload['test_mode'] == true) {
           final updatedAt = DateTime.tryParse('${payload['updated_at'] ?? ''}');
           final age = updatedAt == null
               ? null : DateTime.now().toUtc().difference(updatedAt.toUtc());
@@ -318,6 +314,13 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
             final value = payload['listeners'];
             if (value is int && value >= 0) next = value;
           }
+        } else if (payload is Map<String, dynamic> && _labEndpoint.isEmpty) {
+          if (payload['status'] == false) {
+            next = 0;
+          } else if (payload['status'] == true) {
+            final value = payload['connections'];
+            if (value is int && value >= 0) next = value;
+          }
         }
       }
     } catch (_) {
@@ -327,26 +330,6 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     }
     if (!mounted || !widget.isOnline) return;
     if (_listeners != next) setState(() => _listeners = next);
-  }
-
-  int _previewCount(DateTime local) {
-    final peak = _previewPeak.clamp(1, 100000).toInt();
-    final hour = local.hour + local.minute / 60.0;
-    const points = <double>[
-      .27, .23, .25, .40, .72, .94, 1.0,
-      .96, .82, .66, .48, .35, .27,
-    ];
-    final index = (hour / 2).floor().clamp(0, 11).toInt();
-    var progress = (hour - index * 2) / 2;
-    progress = progress * progress * (3 - 2 * progress);
-    final fraction = points[index] +
-        (points[index + 1] - points[index]) * progress;
-    final minute = local.hour * 60 + local.minute;
-    final phase = (local.year * 366 + local.month * 31 + local.day) % 360;
-    final noise = peak * (
-        .006 * math.sin(minute * 2 * math.pi / 29 + phase) +
-        .003 * math.sin(minute * 2 * math.pi / 13 + phase * .7));
-    return (peak * fraction + noise).round().clamp(0, peak).toInt();
   }
 
   @override
