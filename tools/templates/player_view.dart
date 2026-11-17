@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
@@ -236,18 +238,6 @@ class _PremiumTopBar extends StatelessWidget {
   }
 }
 
-class _ListenerProfile {
-  const _ListenerProfile({
-    required this.minimum,
-    required this.maximum,
-    required this.target,
-  });
-
-  final int minimum;
-  final int maximum;
-  final double target;
-}
-
 class _ListenerCountBadge extends StatefulWidget {
   const _ListenerCountBadge({required this.isOnline});
 
@@ -259,80 +249,71 @@ class _ListenerCountBadge extends StatefulWidget {
 
 class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     with WidgetsBindingObserver {
-  final math.Random _random = math.Random();
-  late int _listeners;
+  // All installations read the same public station figure. It is the
+  // current stream connection count, never a locally generated estimate.
+  static const String _endpoint =
+      'https://portal.juke-box.cz:2020/json/stream/radioceskyraj';
+  final HttpClient _client = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 7);
+  int? _listeners;
   Timer? _refreshTimer;
+  bool _requestInProgress = false;
 
   @override
   void initState() {
     super.initState();
-    _listeners = widget.isOnline ? _initialCount(DateTime.now()) : 0;
+    _listeners = widget.isOnline ? null : 0;
     WidgetsBinding.instance.addObserver(this);
-    _scheduleNextRefresh();
-  }
-
-  void _scheduleNextRefresh() {
-    // A slightly different interval makes updates feel less mechanical.
-    _refreshTimer = Timer(
-      Duration(seconds: 4 + _random.nextInt(8)),
-      () {
-        if (!mounted) return;
-        _refreshCount();
-        _scheduleNextRefresh();
-      },
+    _refreshCount();
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _refreshCount(),
     );
   }
 
-  int _initialCount(DateTime now) {
-    final profile = _profileAt(now);
-    final spread = math.min(35, (profile.maximum - profile.minimum) ~/ 20);
-    final offset = _random.nextInt(spread * 2 + 1) - spread;
-    return (profile.target.round() + offset)
-        .clamp(profile.minimum, profile.maximum)
-        .toInt();
-  }
-
+  @override
   void didUpdateWidget(covariant _ListenerCountBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.isOnline != widget.isOnline) {
-      setState(() {
-        _listeners = widget.isOnline ? _initialCount(DateTime.now()) : 0;
-      });
+    if (oldWidget.isOnline == widget.isOnline) return;
+    if (!widget.isOnline) {
+      setState(() => _listeners = 0);
+    } else {
+      setState(() => _listeners = null);
+      _refreshCount();
     }
   }
 
-  void _refreshCount() {
+  Future<void> _refreshCount() async {
+    if (!mounted || !widget.isOnline || _requestInProgress) return;
+    _requestInProgress = true;
+    int? next;
+    try {
+      final request = await _client.getUrl(Uri.parse(_endpoint))
+          .timeout(const Duration(seconds: 8));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+      final response = await request.close()
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == HttpStatus.ok) {
+        final body = await utf8.decoder.bind(response).join()
+            .timeout(const Duration(seconds: 8));
+        final payload = jsonDecode(body);
+        if (payload is Map<String, dynamic>) {
+          if (payload['status'] == false) {
+            next = 0;
+          } else if (payload['status'] == true) {
+            final value = payload['connections'];
+            if (value is int && value >= 0) next = value;
+          }
+        }
+      }
+    } catch (_) {
+      // Missing statistics must never affect stream playback.
+    } finally {
+      _requestInProgress = false;
+    }
     if (!mounted || !widget.isOnline) return;
-
-    final profile = _profileAt(DateTime.now());
-    final distanceToTrend = profile.target - _listeners;
-
-    // The long-term daily curve gently guides the number up or down.
-    // Small independent movements keep it alive between those trends.
-    var trendStep = 0;
-    if (distanceToTrend.abs() > 12) {
-      final amount = 1 + _random.nextInt(4);
-      trendStep = distanceToTrend > 0 ? amount : -amount;
-    }
-
-    final naturalMovement = _random.nextInt(9) - 4;
-    var change = trendStep + naturalMovement;
-    if (change == 0) {
-      change = _random.nextBool() ? 1 : -1;
-    }
-
-    var next = (_listeners + change)
-        .clamp(profile.minimum, profile.maximum)
-        .toInt();
-
-    // Always show a small movement, even when the value reaches a boundary.
-    if (next == _listeners) {
-      next = _listeners >= profile.maximum
-          ? _listeners - 1
-          : _listeners + 1;
-    }
-
-    setState(() => _listeners = next);
+    if (_listeners != next) setState(() => _listeners = next);
   }
 
   @override
@@ -340,44 +321,8 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     if (state == AppLifecycleState.resumed) _refreshCount();
   }
 
-  static _ListenerProfile _profileAt(DateTime now) {
-    final minute = now.hour * 60 + now.minute;
-
-    if (minute < 360) {
-      return const _ListenerProfile(
-        minimum: 200,
-        maximum: 500,
-        target: 350,
-      );
-    }
-
-    if (minute < 540) {
-      final progress = (minute - 360) / 180.0;
-      return _ListenerProfile(
-        minimum: 1800,
-        maximum: 3600,
-        target: 1800 + 1800 * progress,
-      );
-    }
-
-    if (minute < 960) {
-      final progress = (minute - 540) / 420.0;
-      return _ListenerProfile(
-        minimum: 3600,
-        maximum: 9580,
-        target: 3600 + 5980 * math.sin(math.pi * progress),
-      );
-    }
-
-    final progress = (minute - 960) / 479.0;
-    return _ListenerProfile(
-      minimum: 500,
-      maximum: 3500,
-      target: 3500 - 3000 * progress,
-    );
-  }
-
-  String _formatCount(int value) {
+  String _formatCount(int? value) {
+    if (value == null) return '—';
     final digits = value.toString();
     final output = StringBuffer();
     for (var i = 0; i < digits.length; i++) {
@@ -390,6 +335,7 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _client.close(force: true);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -415,7 +361,7 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
           ),
           const SizedBox(width: 7),
           Text(
-            _formatCount(_listeners),
+            _formatCount(widget.isOnline ? _listeners : 0),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
