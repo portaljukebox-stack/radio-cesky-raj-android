@@ -117,6 +117,7 @@ jobs:
           cache.write_text(gradle.replace('2.17.1','2.19.1'))
           print("Upgraded legacy ExoPlayer from 2.17.1 to 2.19.1 to support Android14+ receivers")
           PY
+          python3 ../tools/patch_android_auto.py
           if [ -n "$RCR_LAB_URL" ]; then
             case "$RCR_LAB_URL" in https://*) ;; *) echo 'Lab URL must use HTTPS'; exit 1;; esac
           fi
@@ -191,6 +192,10 @@ jobs:
               assert "targetSdkVersion:'35'" in out, "APK is still targeting obsolete Android"
               print(apk.name,"Complete station logo included, Android target SDK 35 confirmed")
           PY
+          for APK in result/*.apk; do
+            "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -F 'android.media.browse.MediaBrowserService'
+            "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -F 'com.google.android.gms.car.application'
+          done
           sha256sum result/*.apk
       - uses: actions/upload-artifact@v4
         with:
