@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
@@ -249,80 +247,93 @@ class _ListenerCountBadge extends StatefulWidget {
 
 class _ListenerCountBadgeState extends State<_ListenerCountBadge>
     with WidgetsBindingObserver {
-  // All installations read the same public station figure. It is the
-  // current stream connection count, never a locally generated estimate.
-  static const String _endpoint =
-      'https://portal.juke-box.cz:2020/json/stream/radioceskyraj';
-  final HttpClient _client = HttpClient()
-    ..connectionTimeout = const Duration(seconds: 7);
-  int? _listeners;
+  int _listeners = 0;
   Timer? _refreshTimer;
-  bool _requestInProgress = false;
 
   @override
   void initState() {
     super.initState();
-    _listeners = widget.isOnline ? null : 0;
+    _listeners = widget.isOnline ? _simulatedCountFor(DateTime.now()) : 0;
     WidgetsBinding.instance.addObserver(this);
-    _refreshCount();
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 20),
-      (_) => _refreshCount(),
+      (_) => _refreshSimulatedCount(),
     );
+  }
+
+  // The figure is generated locally from the Prague clock. It is deliberately
+  // independent of MediaCP listener statistics. A 30-second UTC bucket makes
+  // the same figure appear on devices with synchronized clocks.
+  DateTime _pragueTime(DateTime utc) {
+    final start = _lastSundayOfMonth(utc.year, 3).add(const Duration(hours: 1));
+    final end = _lastSundayOfMonth(utc.year, 10).add(const Duration(hours: 1));
+    final summerTime = !utc.isBefore(start) && utc.isBefore(end);
+    return utc.add(Duration(hours: summerTime ? 2 : 1));
+  }
+
+  DateTime _lastSundayOfMonth(int year, int month) {
+    final lastDay = DateTime.utc(year, month + 1, 0);
+    final day = lastDay.day - (lastDay.weekday % 7);
+    return DateTime.utc(year, month, day);
+  }
+
+  int _noise(int seed, int amplitude) {
+    var value = seed & 0x7fffffff;
+    value = (value ^ (value << 13)) & 0x7fffffff;
+    value = (value ^ (value >> 17)) & 0x7fffffff;
+    value = (value ^ (value << 5)) & 0x7fffffff;
+    return value % (amplitude * 2 + 1) - amplitude;
+  }
+
+  int _simulatedCountFor(DateTime now) {
+    final utc = now.toUtc();
+    final prague = _pragueTime(utc);
+    final minute = prague.hour * 60 + prague.minute;
+    final bucket = utc.millisecondsSinceEpoch ~/ 30000;
+
+    if (minute < 360) {
+      return (350 + _noise(bucket, 150)).clamp(200, 500);
+    }
+
+    if (minute < 540) {
+      final progress = (minute - 360) / 180.0;
+      final base = 1800 + (1800 * progress).round();
+      return (base + _noise(bucket, 110)).clamp(1800, 3600);
+    }
+
+    if (minute < 960) {
+      final progress = (minute - 540) / 420.0;
+      final wave = 6600 +
+          1700 * math.sin(progress * math.pi * 2) +
+          950 * math.sin(progress * math.pi * 6 + 1.1);
+      return (wave.round() + _noise(bucket, 90)).clamp(3600, 9580);
+    }
+
+    final progress = (minute - 960) / 479.0;
+    final base = 3500 - (3000 * progress);
+    return (base.round() + _noise(bucket, 80)).clamp(500, 3500);
+  }
+
+  void _refreshSimulatedCount() {
+    if (!mounted) return;
+    final next = widget.isOnline ? _simulatedCountFor(DateTime.now()) : 0;
+    if (_listeners != next) setState(() => _listeners = next);
   }
 
   @override
   void didUpdateWidget(covariant _ListenerCountBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.isOnline == widget.isOnline) return;
-    if (!widget.isOnline) {
-      setState(() => _listeners = 0);
-    } else {
-      setState(() => _listeners = null);
-      _refreshCount();
+    if (oldWidget.isOnline != widget.isOnline) {
+      _refreshSimulatedCount();
     }
-  }
-
-  Future<void> _refreshCount() async {
-    if (!mounted || !widget.isOnline || _requestInProgress) return;
-    _requestInProgress = true;
-    int? next;
-    try {
-      final request = await _client.getUrl(Uri.parse(_endpoint))
-          .timeout(const Duration(seconds: 8));
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-      final response = await request.close()
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode == HttpStatus.ok) {
-        final body = await utf8.decoder.bind(response).join()
-            .timeout(const Duration(seconds: 8));
-        final payload = jsonDecode(body);
-        if (payload is Map<String, dynamic>) {
-          if (payload['status'] == false) {
-            next = 0;
-          } else if (payload['status'] == true) {
-            final value = payload['connections'];
-            if (value is int && value >= 0) next = value;
-          }
-        }
-      }
-    } catch (_) {
-      // Missing statistics must never affect stream playback.
-    } finally {
-      _requestInProgress = false;
-    }
-    if (!mounted || !widget.isOnline) return;
-    if (_listeners != next) setState(() => _listeners = next);
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshCount();
+    if (state == AppLifecycleState.resumed) _refreshSimulatedCount();
   }
 
-  String _formatCount(int? value) {
-    if (value == null) return '—';
+  String _formatCount(int value) {
     final digits = value.toString();
     final output = StringBuffer();
     for (var i = 0; i < digits.length; i++) {
@@ -335,7 +346,6 @@ class _ListenerCountBadgeState extends State<_ListenerCountBadge>
   @override
   void dispose() {
     _refreshTimer?.cancel();
-    _client.close(force: true);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
