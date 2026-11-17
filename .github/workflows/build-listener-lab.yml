@@ -10,14 +10,14 @@ on:
   workflow_dispatch:
     inputs:
       listener_url:
-        description: 'Optional HTTPS URL of the private VPS JSON snapshot (empty = public real MediaCP connections)'
+        description: 'HTTPS URL of the VPS JSON snapshot (empty = configured VPS listener lab)'
         required: false
         type: string
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      RCR_LAB_URL: ${{ inputs.listener_url || '' }}
+      RCR_LAB_URL: ${{ inputs.listener_url || 'https://portal.juke-box.cz:2020/pub/rcr-listener-lab/listeners.json' }}
     permissions:
       contents: read
     steps:
